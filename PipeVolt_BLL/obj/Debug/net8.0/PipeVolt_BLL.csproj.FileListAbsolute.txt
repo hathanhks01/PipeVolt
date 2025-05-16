@@ -1,0 +1,15 @@
+D:\PipeVolt\PipeVolt_BLL\obj\Debug\net8.0\PipeVolt_BLL.csproj.AssemblyReference.cache
+D:\PipeVolt\PipeVolt_BLL\obj\Debug\net8.0\PipeVolt_BLL.GeneratedMSBuildEditorConfig.editorconfig
+D:\PipeVolt\PipeVolt_BLL\obj\Debug\net8.0\PipeVolt_BLL.AssemblyInfoInputs.cache
+D:\PipeVolt\PipeVolt_BLL\obj\Debug\net8.0\PipeVolt_BLL.AssemblyInfo.cs
+D:\PipeVolt\PipeVolt_BLL\obj\Debug\net8.0\PipeVolt_BLL.csproj.CoreCompileInputs.cache
+D:\PipeVolt\PipeVolt_BLL\bin\Debug\net8.0\PipeVolt_BLL.deps.json
+D:\PipeVolt\PipeVolt_BLL\bin\Debug\net8.0\PipeVolt_BLL.dll
+D:\PipeVolt\PipeVolt_BLL\bin\Debug\net8.0\PipeVolt_BLL.pdb
+D:\PipeVolt\PipeVolt_BLL\bin\Debug\net8.0\PipeVolt_DAL.dll
+D:\PipeVolt\PipeVolt_BLL\bin\Debug\net8.0\PipeVolt_DAL.pdb
+D:\PipeVolt\PipeVolt_BLL\obj\Debug\net8.0\PipeVolt.91E63C86.Up2Date
+D:\PipeVolt\PipeVolt_BLL\obj\Debug\net8.0\PipeVolt_BLL.dll
+D:\PipeVolt\PipeVolt_BLL\obj\Debug\net8.0\refint\PipeVolt_BLL.dll
+D:\PipeVolt\PipeVolt_BLL\obj\Debug\net8.0\PipeVolt_BLL.pdb
+D:\PipeVolt\PipeVolt_BLL\obj\Debug\net8.0\ref\PipeVolt_BLL.dll

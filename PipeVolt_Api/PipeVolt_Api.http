@@ -1,0 +1,6 @@
+@PipeVolt_Api_HostAddress = http://localhost:8080
+
+GET {{PipeVolt_Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

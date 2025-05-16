@@ -1,0 +1,14 @@
+D:\PipeVolt\PipeVolt_DAL\bin\Debug\net8.0\PipeVolt_DAL.deps.json
+D:\PipeVolt\PipeVolt_DAL\bin\Debug\net8.0\PipeVolt_DAL.runtimeconfig.json
+D:\PipeVolt\PipeVolt_DAL\bin\Debug\net8.0\PipeVolt_DAL.dll
+D:\PipeVolt\PipeVolt_DAL\bin\Debug\net8.0\PipeVolt_DAL.pdb
+D:\PipeVolt\PipeVolt_DAL\obj\Debug\net8.0\PipeVolt_DAL.csproj.AssemblyReference.cache
+D:\PipeVolt\PipeVolt_DAL\obj\Debug\net8.0\PipeVolt_DAL.GeneratedMSBuildEditorConfig.editorconfig
+D:\PipeVolt\PipeVolt_DAL\obj\Debug\net8.0\PipeVolt_DAL.AssemblyInfoInputs.cache
+D:\PipeVolt\PipeVolt_DAL\obj\Debug\net8.0\PipeVolt_DAL.AssemblyInfo.cs
+D:\PipeVolt\PipeVolt_DAL\obj\Debug\net8.0\PipeVolt_DAL.csproj.CoreCompileInputs.cache
+D:\PipeVolt\PipeVolt_DAL\obj\Debug\net8.0\PipeVolt_DAL.dll
+D:\PipeVolt\PipeVolt_DAL\obj\Debug\net8.0\refint\PipeVolt_DAL.dll
+D:\PipeVolt\PipeVolt_DAL\obj\Debug\net8.0\PipeVolt_DAL.pdb
+D:\PipeVolt\PipeVolt_DAL\obj\Debug\net8.0\PipeVolt_DAL.genruntimeconfig.cache
+D:\PipeVolt\PipeVolt_DAL\obj\Debug\net8.0\ref\PipeVolt_DAL.dll
