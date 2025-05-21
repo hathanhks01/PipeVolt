@@ -12,6 +12,7 @@ namespace PipeVolt_Api.Controllers
         public EmployeesController(IEmployeeService svc) => _svc = svc;
 
         [HttpGet]
+        [Route("GetList")]
         public async Task<IActionResult> GetAll()
             => Ok(await _svc.GetAllAsync());
 

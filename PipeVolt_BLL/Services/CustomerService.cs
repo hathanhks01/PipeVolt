@@ -2,6 +2,7 @@
 using PipeVolt_Api.Common.Repository;
 using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.DTOS;
+using PipeVolt_DAL.IRepositories;
 using PipeVolt_DAL.Models;
 using System;
 using System.Collections.Generic;
@@ -13,15 +14,18 @@ namespace PipeVolt_BLL.Services
     public class CustomerService : ICustomerService
     {
         private readonly IGenericRepository<Customer> _repo;
+        private readonly ICustomerRepository _customerRepo;
         private readonly ILoggerService _loggerService;
         private readonly IMapper _mapper;
 
         public CustomerService(
             IGenericRepository<Customer> repo,
+             ICustomerRepository customerRepo,
             ILoggerService loggerService,
             IMapper mapper)
         {
             _repo = repo ?? throw new ArgumentNullException(nameof(repo));
+            _customerRepo = customerRepo ?? throw new ArgumentNullException(nameof(customerRepo));
             _loggerService = loggerService ?? throw new ArgumentNullException(nameof(loggerService));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         }
@@ -79,6 +83,7 @@ namespace PipeVolt_BLL.Services
                 _loggerService.LogInformation($"Adding new customer: {dto.CustomerName}");
                 var entity = _mapper.Map<Customer>(dto);
                 entity.RegistrationDate = DateOnly.FromDateTime(DateTime.UtcNow);
+                entity.CustomerCode = await _customerRepo.RenderCodeAsync();
                 var createdEntity = await _repo.Create(entity);
                 var result = _mapper.Map<CustomerDto>(createdEntity);
                 _loggerService.LogInformation($"Added customer with ID {result.CustomerId}");

@@ -12,6 +12,7 @@ namespace PipeVolt_Api.Controllers
         public WarrantiesController(IWarrantyService service) => _service = service;
 
         [HttpGet]
+        [Route("GetList")]
         public async Task<ActionResult<List<WarrantyDto>>> GetAll() => Ok(await _service.GetAllWarrantiesAsync());
 
         [HttpGet("{id}")]

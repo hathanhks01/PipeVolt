@@ -12,6 +12,7 @@ namespace PipeVolt_Api.Controllers
         public SuppliesController(ISupplyService service) => _service = service;
 
         [HttpGet]
+        [Route("GetList")]
         public async Task<ActionResult<List<SupplyDto>>> GetAll() => Ok(await _service.GetAllSuppliesAsync());
 
         [HttpGet("{id}")]

@@ -37,6 +37,7 @@ namespace PipeVolt.Controllers
         }
 
         [HttpGet]
+        [Route("GetList")]
         public async Task<ActionResult<IEnumerable<ProductDto>>> GetAllProducts()
         {
             var products = await _productService.GetAllProductsAsync();

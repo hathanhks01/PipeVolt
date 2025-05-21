@@ -23,6 +23,7 @@ namespace PipeVolt_Api.Controllers
         /// </summary>
         /// <returns>Danh sách CustomerDto</returns>
         [HttpGet]
+        [Route("GetList")]
         public async Task<ActionResult<IEnumerable<CustomerDto>>> GetAllCustomers()
         {
             try

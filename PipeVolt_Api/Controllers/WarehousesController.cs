@@ -12,6 +12,7 @@ namespace PipeVolt_Api.Controllers
         public WarehousesController(IWarehouseService service) => _service = service;
 
         [HttpGet]
+        [Route("GetList")]
         public async Task<ActionResult<List<WarehouseDto>>> GetAll() => Ok(await _service.GetAllWarehousesAsync());
 
         [HttpGet("{id}")]

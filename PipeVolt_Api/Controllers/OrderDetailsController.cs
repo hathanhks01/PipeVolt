@@ -12,6 +12,7 @@ namespace PipeVolt_Api.Controllers
         public OrderDetailsController(IOrderDetailService service) => _service = service;
 
         [HttpGet]
+        [Route("GetList")]
         public async Task<ActionResult<List<OrderDetailDto>>> GetAll() => Ok(await _service.GetAllOrderDetailsAsync());
 
         [HttpGet("{id}")]

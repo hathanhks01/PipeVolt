@@ -24,6 +24,7 @@ namespace PipeVolt_Api.Controllers
         /// </summary>
         /// <returns>Danh sách BrandDto</returns>
         [HttpGet]
+        [Route("GetList")]
         public async Task<ActionResult<IEnumerable<BrandDto>>> GetAllBrands()
         {
             try
