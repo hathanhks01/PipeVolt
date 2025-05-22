@@ -1,9 +1,12 @@
 ﻿using AutoMapper;
 using PipeVolt_Api.Common;
 using PipeVolt_Api.Common.Repository;
+using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.DTOS;
 using PipeVolt_DAL.Models;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace PipeVolt_BLL.Services
@@ -12,91 +15,151 @@ namespace PipeVolt_BLL.Services
     {
         private readonly IGenericRepository<Product> _repo;
         private readonly IMapper _mapper;
+        private readonly ILoggerService _logger;
 
         public ProductService(
             IGenericRepository<Product> repo,
-            IMapper mapper)
+            IMapper mapper,
+            ILoggerService logger)
         {
             _repo = repo;
             _mapper = mapper;
+            _logger = logger;
         }
 
         public async Task<ProductDto> GetProductByIdAsync(int productId)
         {
-            var products = await _repo.QueryBy(p => p.ProductId == productId);
-            var product = await Task.Run(() => products.FirstOrDefault());
-            if (product == null)
-                throw new KeyNotFoundException("Product not found.");
+            try
+            {
+                var products = await _repo.QueryBy(p => p.ProductId == productId);
+                var product = await Task.Run(() => products.FirstOrDefault());
+                if (product == null)
+                    throw new KeyNotFoundException("Product not found.");
 
-            return _mapper.Map<ProductDto>(product);
+                return _mapper.Map<ProductDto>(product);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in GetProductByIdAsync", ex);
+                throw;
+            }
         }
 
         public async Task<IEnumerable<ProductDto>> GetAllProductsAsync()
         {
-            var products = await _repo.GetAll();
-            return _mapper.Map<IEnumerable<ProductDto>>(products);
+            try
+            {
+                var products = await _repo.GetAll();
+                return _mapper.Map<IEnumerable<ProductDto>>(products);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in GetAllProductsAsync", ex);
+                throw;
+            }
         }
 
         public async Task<ProductDto> CreateProductAsync(CreateProductDto dto)
         {
-            var entity = _mapper.Map<Product>(dto);
-
-            if (dto.ImageFile != null)
+            try
             {
-                try
-                {
-                    string imagePath = CommonFunctions.UploadFile(dto.ImageFile, "images/products");
-                    entity.ImageUrl = imagePath;
-                }
-                catch (ArgumentException ex)
-                {
-                    throw new InvalidOperationException("Failed to upload image: " + ex.Message);
-                }
-            }
+                var entity = _mapper.Map<Product>(dto);
 
-            var created = await _repo.Create(entity);
-            return _mapper.Map<ProductDto>(created);
+                if (dto.ImageFile != null)
+                {
+                    try
+                    {
+                        string imagePath = CommonFunctions.UploadFile(dto.ImageFile, "images/products");
+                        entity.ImageUrl = imagePath;
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        _logger.LogError("Image upload failed", ex);
+                        throw new InvalidOperationException("Failed to upload image: " + ex.Message);
+                    }
+                }
+
+                var created = await _repo.Create(entity);
+                return _mapper.Map<ProductDto>(created);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in CreateProductAsync", ex);
+                throw;
+            }
         }
 
         public async Task<ProductDto> UpdateProductAsync(int productId, UpdateProductDto dto)
         {
-            // 1. Lấy entity
-            var products = await _repo.QueryBy(p => p.ProductId == productId);
-            var entity = await Task.Run(() => products.FirstOrDefault());
-            if (entity == null)
-                throw new KeyNotFoundException("Product not found.");
-
-            // 2. Map dto lên entity
-            _mapper.Map(dto, entity);
-            if (dto.ImageFile != null)
+            try
             {
-                try
-                {
-                    string imagePath = CommonFunctions.UploadFile(dto.ImageFile, "images/products");
-                    entity.ImageUrl = imagePath; 
-                }
-                catch (ArgumentException ex)
-                {
-                    throw new InvalidOperationException("Failed to upload image: " + ex.Message);
-                }
-            }
-            // 3. Cập nhật
-            await _repo.Update(entity);
+                var products = await _repo.QueryBy(p => p.ProductId == productId);
+                var entity = await Task.Run(() => products.FirstOrDefault());
+                if (entity == null)
+                    throw new KeyNotFoundException("Product not found.");
 
-            return _mapper.Map<ProductDto>(entity);
+                _mapper.Map(dto, entity);
+
+                if (dto.ImageFile != null)
+                {
+                    try
+                    {
+                        string imagePath = CommonFunctions.UploadFile(dto.ImageFile, "images/products");
+                        entity.ImageUrl = imagePath;
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        _logger.LogError("Image upload failed", ex);
+                        throw new InvalidOperationException("Failed to upload image: " + ex.Message);
+                    }
+                }
+
+                await _repo.Update(entity);
+                return _mapper.Map<ProductDto>(entity);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in UpdateProductAsync", ex);
+                throw;
+            }
         }
 
         public async Task<bool> DeleteProductAsync(int productId)
         {
-            // 1. Lấy entity
-            var products = await _repo.QueryBy(p => p.ProductId == productId);
-            var entity = await Task.Run(() => products.FirstOrDefault());
-            if (entity == null)
-                throw new KeyNotFoundException("Product not found.");
+            try
+            {
+                var products = await _repo.QueryBy(p => p.ProductId == productId);
+                var entity = await Task.Run(() => products.FirstOrDefault());
+                if (entity == null)
+                    throw new KeyNotFoundException("Product not found.");
 
-            // 2. Xóa
-            await _repo.Delete(entity);
-            return true;
+                // Xóa ảnh vật lý nếu tồn tại
+                if (!string.IsNullOrWhiteSpace(entity.ImageUrl))
+                {
+                    try
+                    {
+                        string fullImagePath = CommonFunctions.PhysicalPath(entity.ImageUrl);
+                        if (File.Exists(fullImagePath))
+                        {
+                            File.Delete(fullImagePath);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError("Error deleting product image file", ex);
+                        // Có thể không throw để vẫn cho phép xóa Product nếu chỉ xóa ảnh lỗi
+                    }
+                }
+
+                await _repo.Delete(entity);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in DeleteProductAsync", ex);
+                throw;
+            }
         }
+
     }
 }

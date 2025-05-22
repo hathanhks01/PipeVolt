@@ -54,6 +54,7 @@ builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 // Repositories
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IUserAccountRepository, UserAccountRepository>();
+builder.Services.AddScoped<IGenericRepository<UserAccount>, UserAccountRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IGenericRepository<Customer>, CustomerRepository>();
 builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
@@ -65,6 +66,7 @@ builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IGenericRepository<Customer>, CustomerRepository>();
 builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
 builder.Services.AddScoped<IGenericRepository<ProductCategory>, ProductCategoryRepository>();
+builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IGenericRepository<Employee>, EmployeeRepository>();
 builder.Services.AddScoped<IGenericRepository<Inventory>, InventoryRepository>();
@@ -76,6 +78,10 @@ builder.Services.AddScoped<IGenericRepository<Supplier>, SupplierRepository>();
 builder.Services.AddScoped<IGenericRepository<Supply>, SupplyRepository>();
 builder.Services.AddScoped<IGenericRepository<Warehouse>, WarehouseRepository>();
 builder.Services.AddScoped<IGenericRepository<Warranty>, WarrantyRepository>();
+builder.Services.AddScoped<IGenericRepository<Cart>, CartRepository>();
+builder.Services.AddScoped<IGenericRepository<CartItem>, CartItemRepository>();
+builder.Services.AddScoped<ICartRepository,CartRepository>();
+builder.Services.AddScoped<ICartItemRepository,CartItemRepository>();
 
 // Services
 builder.Services.AddScoped<IInventoryService, InventoryService>();
@@ -87,6 +93,9 @@ builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<ISupplyService, SupplyService>();
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 builder.Services.AddScoped<IWarrantyService, WarrantyService>();
+builder.Services.AddScoped<ICartItemService, CartItemService>();
+builder.Services.AddScoped<ICartService, CartService>();
+builder.Services.AddScoped<IUserAccountService, UserAccountService>();
 
 // Logger
 builder.Services.AddScoped<ILoggerService, LoggerService>();

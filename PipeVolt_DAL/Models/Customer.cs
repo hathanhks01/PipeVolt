@@ -39,6 +39,8 @@ public partial class Customer
 
     [InverseProperty("Customer")]
     public virtual ICollection<SalesOrder> SalesOrders { get; set; } = new List<SalesOrder>();
+    [InverseProperty("Customer")]
+    public virtual ICollection<Cart> Carts { get; set; } = new List<Cart>();
 
     [InverseProperty("Customer")]
     public virtual ICollection<UserAccount> UserAccounts { get; set; } = new List<UserAccount>();

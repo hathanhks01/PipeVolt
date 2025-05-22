@@ -1,6 +1,6 @@
 ﻿using PipeVolt_DAL.DTOS;
 
-namespace PipeVolt_BLL.Services
+namespace PipeVolt_BLL.IServices
 {
     public interface IWarrantyService
     {

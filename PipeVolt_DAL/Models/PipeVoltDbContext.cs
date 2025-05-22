@@ -14,7 +14,8 @@ public partial class PipeVoltDbContext : DbContext
         : base(options)
     {
     }
-
+    public virtual DbSet<Cart> Carts { get; set; }
+    public virtual DbSet<CartItem> CartItems { get; set; }
     public virtual DbSet<Brand> Brands { get; set; }
 
     public virtual DbSet<Customer> Customers { get; set; }

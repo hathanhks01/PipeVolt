@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using PipeVolt_DAL.DTOS;
+using PipeVolt_DAL.DTOS.PipeVolt_DAL.DTOS;
 using PipeVolt_DAL.Models;
 
 public class AutoMapperProfiles : Profile
@@ -90,6 +91,38 @@ public class AutoMapperProfiles : Profile
         CreateMap<CreateWarrantyDto, Warranty>()
             .ForMember(dest => dest.WarrantyId, opt => opt.Ignore());
         CreateMap<UpdateWarrantyDto, Warranty>();
+        // Ánh xạ mới cho Cart
+        CreateMap<Cart, CartDto>()
+            .ForMember(dest => dest.TotalAmount, opt => opt.Ignore()) // Tổng sẽ được tính trong service
+            .ForMember(dest => dest.CartItems, opt => opt.MapFrom(src => src.CartItems));
+        CreateMap<CreateCartDto, Cart>()
+            .ForMember(dest => dest.CartId, opt => opt.Ignore())
+            .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore());
+        CreateMap<UpdateCartDto, Cart>()
+            .ForMember(dest => dest.CartId, opt => opt.Ignore())
+            .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore());
 
+        // Ánh xạ mới cho CartItem
+        CreateMap<CartItem, CartItemDto>()
+            .ForMember(dest => dest.ProductName, opt => opt.MapFrom(src => src.Product.ProductName));
+        CreateMap<AddCartItemDto, CartItem>()
+            .ForMember(dest => dest.CartItemId, opt => opt.Ignore())
+            .ForMember(dest => dest.CartId, opt => opt.Ignore())
+            .ForMember(dest => dest.UnitPrice, opt => opt.Ignore()) // UnitPrice sẽ được gán trong service
+            .ForMember(dest => dest.LineTotal, opt => opt.Ignore()); // Tính tự động trong DB
+        CreateMap<UpdateCartItemDto, CartItem>()
+            .ForMember(dest => dest.CartItemId, opt => opt.Ignore())
+            .ForMember(dest => dest.CartId, opt => opt.Ignore())
+            .ForMember(dest => dest.ProductId, opt => opt.Ignore())
+            .ForMember(dest => dest.UnitPrice, opt => opt.Ignore())
+            .ForMember(dest => dest.LineTotal, opt => opt.Ignore());
+        // Thêm vào AutoMapperProfiles constructor
+        CreateMap<UserAccount, UserAccountDto>();
+        CreateMap<CreateUserAccountDto, UserAccount>()
+            .ForMember(dest => dest.UserId, opt => opt.Ignore());
+        CreateMap<UpdateUserAccountDto, UserAccount>()
+            .ForMember(dest => dest.UserId, opt => opt.Ignore());
     }
 }

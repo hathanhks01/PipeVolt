@@ -32,4 +32,32 @@ namespace PipeVolt_DAL.DTOS
         public int? PurchaseOrderId { get; set; }
         [Required] public int Quantity { get; set; }
     }
+    public class DispatchInventoryDto
+    {
+        public int ProductId { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    public class TransferInventoryDto
+    {
+        public int ProductId { get; set; }
+        public int FromWarehouseId { get; set; }
+        public int ToWarehouseId { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    public class AdjustInventoryDto
+    {
+        public int WarehouseId { get; set; }
+        public int ProductId { get; set; }
+        public int Quantity { get; set; }
+        public string? Reason { get; set; }
+    }
+
+    public class ReceiveInventoryDto
+    {
+        public int ProductId { get; set; }
+        public int Quantity { get; set; }
+        public int? PurchaseOrderId { get; set; }
+    }
 }

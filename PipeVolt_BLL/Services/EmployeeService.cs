@@ -2,6 +2,7 @@
 using PipeVolt_Api.Common.Repository;
 using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.DTOS;
+using PipeVolt_DAL.IRepositories;
 using PipeVolt_DAL.Models;
 using System;
 using System.Collections.Generic;
@@ -14,14 +15,16 @@ namespace PipeVolt_BLL.Services
     public class EmployeeService : IEmployeeService
     {
         private readonly IGenericRepository<Employee> _repo;
+        private readonly IEmployeeRepository _employeeRepo;
         private readonly ILoggerService _logger;
         private readonly IMapper _mapper;
 
         public EmployeeService(IGenericRepository<Employee> repo,
+                               IEmployeeRepository employeeRepo,
                                ILoggerService logger,
                                IMapper mapper)
         {
-            _repo = repo; _logger = logger; _mapper = mapper;
+            _repo = repo; _logger = logger; _mapper = mapper; _employeeRepo = employeeRepo;
         }
 
         public async Task<List<EmployeeDto>> GetAllAsync()
@@ -39,6 +42,7 @@ namespace PipeVolt_BLL.Services
         public async Task<EmployeeDto> CreateAsync(CreateEmployeeDto dto)
         {
             var ent = _mapper.Map<Employee>(dto);
+            ent.EmployeeCode= await _employeeRepo.GenderCodeEmployee(ent.EmployeeId);
             var created = await _repo.Create(ent);
             return _mapper.Map<EmployeeDto>(created);
         }

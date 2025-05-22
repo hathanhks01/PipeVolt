@@ -19,11 +19,12 @@ namespace PipeVolt_BLL.Services
     public class AuthService : IAuthService
     {
         private readonly IUserAccountRepository IUserAccountRepository;
+        private readonly IGenericRepository<UserAccount> _UserGenericRepository;
         private readonly ICustomerRepository ICustomerRepository;
         private readonly IGenericRepository<Customer> _CusGenericRepository;
         private readonly ILoggerService _logger;
         private readonly IConfiguration _configuration;
-        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IHttpContextAccessor _httpContextAccessor; 
         public AuthService(
             IUserAccountRepository UserAccountRepository,
             ICustomerRepository CustomerRepository,
@@ -108,7 +109,7 @@ namespace PipeVolt_BLL.Services
                     CustomerId = customer.CustomerId,
                     Status = 1
                 };
-                await IUserAccountRepository.AddAsync(user);
+                await _UserGenericRepository.Create(user);
                 _logger.LogInformation($"User {registerDTO.Username} registered successfully");
                 return new AuthResponseDto
                 {
@@ -158,7 +159,7 @@ namespace PipeVolt_BLL.Services
                    claims: claims,
                    expires: DateTime.UtcNow.AddMinutes(jwtExpireMinutes),
                    signingCredentials: credentials
-               );
+               );   
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
