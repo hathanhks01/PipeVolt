@@ -58,6 +58,20 @@ namespace PipeVolt_BLL.Services
                 throw;
             }
         }
+        public async Task<IEnumerable<ProductDto>> GetPopularProductsAsync()
+        {
+            try
+            {
+                string sql = "SELECT TOP 5 * FROM PRODUCT ORDER BY product_name\r\n"; 
+                var products = await _repo.SqlQuery<Product>(sql);
+                return _mapper.Map<IEnumerable<ProductDto>>(products);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in GetAllProductsAsync", ex);
+                throw;
+            }
+        }
 
         public async Task<ProductDto> CreateProductAsync(CreateProductDto dto)
         {

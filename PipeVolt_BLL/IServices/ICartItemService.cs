@@ -7,6 +7,6 @@ namespace PipeVolt_BLL.Services
         Task<CartItemDto> AddCartItemAsync(int cartId, AddCartItemDto dto);
         Task<bool> DeleteCartItemAsync(int cartItemId);
         Task<IEnumerable<CartItemDto>> GetCartItemsByCartIdAsync(int cartId);
-        Task<bool> UpdateCartItemAsync(UpdateCartItemDto dto);
+        Task<CartItemDto> UpdateCartItemAsync(UpdateCartItemDto dto);
     }
 }

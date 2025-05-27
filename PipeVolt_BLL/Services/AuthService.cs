@@ -22,6 +22,7 @@ namespace PipeVolt_BLL.Services
         private readonly IGenericRepository<UserAccount> _UserGenericRepository;
         private readonly ICustomerRepository ICustomerRepository;
         private readonly IGenericRepository<Customer> _CusGenericRepository;
+        private readonly IGenericRepository<Cart> _CartGenericRepository;
         private readonly ILoggerService _logger;
         private readonly IConfiguration _configuration;
         private readonly IHttpContextAccessor _httpContextAccessor; 
@@ -29,16 +30,20 @@ namespace PipeVolt_BLL.Services
             IUserAccountRepository UserAccountRepository,
             ICustomerRepository CustomerRepository,
             IGenericRepository<Customer> CusGenericRepository,
+            IGenericRepository<UserAccount> UserGenericRepository,
             ILoggerService logger,
             IConfiguration configuration,
-             IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor,
+            IGenericRepository<Cart> cartGenericRepository)
         {
             IUserAccountRepository = UserAccountRepository;
             ICustomerRepository = CustomerRepository;
+            _UserGenericRepository = UserGenericRepository;
             _CusGenericRepository = CusGenericRepository;
             _logger = logger;
             _configuration = configuration;
             _httpContextAccessor = httpContextAccessor;
+            _CartGenericRepository = cartGenericRepository;
         }
 
         public async Task<AuthResponseDto> LoginAsync(LoginDto loginDto)
@@ -111,6 +116,13 @@ namespace PipeVolt_BLL.Services
                 };
                 await _UserGenericRepository.Create(user);
                 _logger.LogInformation($"User {registerDTO.Username} registered successfully");
+                var cart = new Cart
+                {
+                    CartId=customer.CustomerId, 
+                    CustomerId = customer.CustomerId,
+                };
+                await _CartGenericRepository.Create(cart);
+                _logger.LogInformation($"Cart {cart.CartId} registered successfully");
                 return new AuthResponseDto
                 {
                     Success = true,

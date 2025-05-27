@@ -52,7 +52,7 @@ namespace PipeVolt_BLL.Services
                     ProductName = ci.Product?.ProductName,
                     Quantity = ci.Quantity,
                     UnitPrice = ci.UnitPrice,
-                    LineTotal = ci.UnitPrice * ci.Quantity
+                    LineTotal = ci.LineTotal
                 }).ToList();
                 _logger.LogInformation($"Fetched {result.Count} cart items for CartId {cartId}");
                 return result;
@@ -91,21 +91,25 @@ namespace PipeVolt_BLL.Services
                         CartId = cartId,
                         ProductId = dto.ProductId,
                         Quantity = dto.Quantity,
-                        UnitPrice = product.SellingPrice ?? 0
+                        UnitPrice = product.SellingPrice ?? 0,
+                        LineTotal = dto.Quantity * (product.SellingPrice ?? 0) 
                     };
                     await _cartItemGenericRepo.Create(existingItem);
                     _logger.LogInformation($"Created new cart item {existingItem.CartItemId}");
                 }
+
+                // 🔥 FIX: Load lại product info để đảm bảo có đầy đủ thông tin
+                var updatedProduct = await _productRepository.QueryBy(p => p.ProductId == existingItem.ProductId).Result.FirstOrDefaultAsync();
 
                 return new CartItemDto
                 {
                     CartItemId = existingItem.CartItemId,
                     CartId = existingItem.CartId,
                     ProductId = existingItem.ProductId,
-                    ProductName = product.ProductName,
+                    ProductName = updatedProduct?.ProductName ?? product.ProductName,
                     Quantity = existingItem.Quantity,
                     UnitPrice = existingItem.UnitPrice,
-                    LineTotal = existingItem.Quantity * existingItem.UnitPrice
+                    LineTotal = existingItem.Quantity * existingItem.UnitPrice // ✅ Tính LineTotal
                 };
             }
             catch (Exception ex)
@@ -115,23 +119,37 @@ namespace PipeVolt_BLL.Services
             }
         }
 
-        public async Task<bool> UpdateCartItemAsync(UpdateCartItemDto dto)
+        public async Task<CartItemDto> UpdateCartItemAsync(UpdateCartItemDto dto)
         {
             try
             {
                 _logger.LogInformation($"Updating cart item {dto.CartItemId}");
 
-                var item = await _cartItemGenericRepo.QueryBy(ci => ci.CartItemId == dto.CartItemId).Result.FirstOrDefaultAsync();
+                var item = await _cartItemGenericRepo.QueryBy(ci => ci.CartItemId == dto.CartItemId)
+                    .Result.Include(ci => ci.Product).FirstOrDefaultAsync();
+
                 if (item == null)
                 {
                     _logger.LogWarning($"Cart item {dto.CartItemId} not found");
-                    return false;
+                    return null; // ✅ Thay đổi return type từ bool sang CartItemDto
                 }
 
                 item.Quantity = dto.Quantity;
+                item.LineTotal = item.Quantity * item.UnitPrice; 
                 await _cartItemGenericRepo.Update(item);
                 _logger.LogInformation($"Updated cart item {dto.CartItemId} quantity to {dto.Quantity}");
-                return true;
+
+                // ✅ Return CartItemDto với LineTotal đã cập nhật
+                return new CartItemDto
+                {
+                    CartItemId = item.CartItemId,
+                    CartId = item.CartId,
+                    ProductId = item.ProductId,
+                    ProductName = item.Product?.ProductName,
+                    Quantity = item.Quantity,
+                    UnitPrice = item.UnitPrice,
+                    LineTotal = item.Quantity * item.UnitPrice
+                };
             }
             catch (Exception ex)
             {

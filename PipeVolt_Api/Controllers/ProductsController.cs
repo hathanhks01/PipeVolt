@@ -43,6 +43,13 @@ namespace PipeVolt.Controllers
             var products = await _productService.GetAllProductsAsync();
             return Ok(products);
         }
+        [HttpGet]
+        [Route("GetPopularList")]
+        public async Task<ActionResult<IEnumerable<ProductDto>>> GetPopularList()
+        {
+            var products = await _productService.GetPopularProductsAsync();
+            return Ok(products);
+        }
 
         [HttpPost]
         public async Task<IActionResult> CreateProduct([FromForm] CreateProductDto dto, IFormFile? imageFile)

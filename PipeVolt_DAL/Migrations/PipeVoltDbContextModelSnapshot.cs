@@ -46,6 +46,69 @@ namespace PipeVolt_DAL.Migrations
                     b.ToTable("BRAND");
                 });
 
+            modelBuilder.Entity("PipeVolt_DAL.Models.Cart", b =>
+                {
+                    b.Property<int>("CartId")
+                        .HasColumnType("int")
+                        .HasColumnName("cart_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("CartId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.ToTable("CART");
+                });
+
+            modelBuilder.Entity("PipeVolt_DAL.Models.CartItem", b =>
+                {
+                    b.Property<int>("CartItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("cart_item_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CartItemId"));
+
+                    b.Property<int>("CartId")
+                        .HasColumnType("int")
+                        .HasColumnName("cart_id");
+
+                    b.Property<double>("LineTotal")
+                        .HasColumnType("float")
+                        .HasColumnName("line_total");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int")
+                        .HasColumnName("product_id");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int")
+                        .HasColumnName("quantity");
+
+                    b.Property<double>("UnitPrice")
+                        .HasColumnType("float")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("CartItemId");
+
+                    b.HasIndex("CartId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("CART_ITEM");
+                });
+
             modelBuilder.Entity("PipeVolt_DAL.Models.Customer", b =>
                 {
                     b.Property<int>("CustomerId")
@@ -675,6 +738,36 @@ namespace PipeVolt_DAL.Migrations
                     b.ToTable("WARRANTY");
                 });
 
+            modelBuilder.Entity("PipeVolt_DAL.Models.Cart", b =>
+                {
+                    b.HasOne("PipeVolt_DAL.Models.Customer", "Customer")
+                        .WithMany("Carts")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("PipeVolt_DAL.Models.CartItem", b =>
+                {
+                    b.HasOne("PipeVolt_DAL.Models.Cart", "Cart")
+                        .WithMany("CartItems")
+                        .HasForeignKey("CartId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PipeVolt_DAL.Models.Product", "Product")
+                        .WithMany("CartItems")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Cart");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("PipeVolt_DAL.Models.Inventory", b =>
                 {
                     b.HasOne("PipeVolt_DAL.Models.Product", "Product")
@@ -850,8 +943,15 @@ namespace PipeVolt_DAL.Migrations
                     b.Navigation("Products");
                 });
 
+            modelBuilder.Entity("PipeVolt_DAL.Models.Cart", b =>
+                {
+                    b.Navigation("CartItems");
+                });
+
             modelBuilder.Entity("PipeVolt_DAL.Models.Customer", b =>
                 {
+                    b.Navigation("Carts");
+
                     b.Navigation("SalesOrders");
 
                     b.Navigation("UserAccounts");
@@ -870,6 +970,8 @@ namespace PipeVolt_DAL.Migrations
 
             modelBuilder.Entity("PipeVolt_DAL.Models.Product", b =>
                 {
+                    b.Navigation("CartItems");
+
                     b.Navigation("Inventories");
 
                     b.Navigation("OrderDetails");

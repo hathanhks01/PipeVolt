@@ -56,10 +56,12 @@ namespace PipeVolt_Api.Controllers
             try
             {
                 _logger.LogInformation($"[PUT] Updating cart item ID {dto.CartItemId}");
-                var success = await _cartItemService.UpdateCartItemAsync(dto);
-                if (!success) return NotFound("Cart item not found");
+                var result = await _cartItemService.UpdateCartItemAsync(dto);
 
-                return Ok("Cart item updated");
+                if (result == null)
+                    return NotFound("Cart item not found");
+
+                return Ok(result); // ✅ Return CartItemDto với LineTotal đã cập nhật
             }
             catch (Exception ex)
             {

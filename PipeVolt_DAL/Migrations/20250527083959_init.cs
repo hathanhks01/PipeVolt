@@ -106,6 +106,26 @@ namespace PipeVolt_DAL.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "CART",
+                columns: table => new
+                {
+                    cart_id = table.Column<int>(type: "int", nullable: false),
+                    customer_id = table.Column<int>(type: "int", nullable: false),
+                    created_at = table.Column<DateTime>(type: "datetime", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "datetime", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CART", x => x.cart_id);
+                    table.ForeignKey(
+                        name: "FK_CART_CUSTOMER_customer_id",
+                        column: x => x.customer_id,
+                        principalTable: "CUSTOMER",
+                        principalColumn: "customer_id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "SALES_ORDER",
                 columns: table => new
                 {
@@ -175,6 +195,7 @@ namespace PipeVolt_DAL.Migrations
                     product_name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     category_id = table.Column<int>(type: "int", nullable: true),
                     brand_id = table.Column<int>(type: "int", nullable: true),
+                    selling_price = table.Column<double>(type: "float", nullable: true),
                     unit = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
                     description = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     image_url = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true)
@@ -220,6 +241,35 @@ namespace PipeVolt_DAL.Migrations
                         column: x => x.supplier_id,
                         principalTable: "SUPPLIER",
                         principalColumn: "supplier_id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "CART_ITEM",
+                columns: table => new
+                {
+                    cart_item_id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    cart_id = table.Column<int>(type: "int", nullable: false),
+                    product_id = table.Column<int>(type: "int", nullable: false),
+                    quantity = table.Column<int>(type: "int", nullable: false),
+                    unit_price = table.Column<double>(type: "float", nullable: false),
+                    line_total = table.Column<double>(type: "float", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CART_ITEM", x => x.cart_item_id);
+                    table.ForeignKey(
+                        name: "FK_CART_ITEM_CART_cart_id",
+                        column: x => x.cart_id,
+                        principalTable: "CART",
+                        principalColumn: "cart_id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_CART_ITEM_PRODUCT_product_id",
+                        column: x => x.product_id,
+                        principalTable: "PRODUCT",
+                        principalColumn: "product_id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -371,6 +421,21 @@ namespace PipeVolt_DAL.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_CART_customer_id",
+                table: "CART",
+                column: "customer_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CART_ITEM_cart_id",
+                table: "CART_ITEM",
+                column: "cart_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CART_ITEM_product_id",
+                table: "CART_ITEM",
+                column: "product_id");
+
+            migrationBuilder.CreateIndex(
                 name: "UQ__CUSTOMER__6A9E4CB785B4A11F",
                 table: "CUSTOMER",
                 column: "customer_code",
@@ -510,6 +575,9 @@ namespace PipeVolt_DAL.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
+                name: "CART_ITEM");
+
+            migrationBuilder.DropTable(
                 name: "INVENTORY");
 
             migrationBuilder.DropTable(
@@ -526,6 +594,9 @@ namespace PipeVolt_DAL.Migrations
 
             migrationBuilder.DropTable(
                 name: "WARRANTY");
+
+            migrationBuilder.DropTable(
+                name: "CART");
 
             migrationBuilder.DropTable(
                 name: "WAREHOUSE");
