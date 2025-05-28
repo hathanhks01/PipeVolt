@@ -118,7 +118,7 @@ namespace PipeVolt_BLL.Services
                 _logger.LogInformation($"User {registerDTO.Username} registered successfully");
                 var cart = new Cart
                 {
-                    CartId=customer.CustomerId, 
+                    CartId=user.UserId, 
                     CustomerId = customer.CustomerId,
                 };
                 await _CartGenericRepository.Create(cart);

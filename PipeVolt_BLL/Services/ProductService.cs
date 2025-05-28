@@ -68,7 +68,7 @@ namespace PipeVolt_BLL.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError("Error in GetAllProductsAsync", ex);
+                _logger.LogError("Error in GetPopularProductsAsync", ex);
                 throw;
             }
         }

@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using PipeVolt_Api.Common.Repository;
 using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.DTOS;
@@ -21,14 +22,15 @@ namespace PipeVolt_BLL.Services
         private readonly IGenericRepository<CartItem> _cartItemGenericRepo;
         private readonly ILoggerService _logger;
         private readonly IMapper _mapper;
-
+        private readonly IMemoryCache _cache;
         public CartItemService(
             ICartItemRepository cartItemRepo,
             ICartRepository cartRepo,
             IGenericRepository<Product> productRepository,
             IGenericRepository<CartItem> cartItemGenericRepo,
             ILoggerService logger,
-            IMapper mapper)
+            IMapper mapper,
+            IMemoryCache cache)
         {
             _cartItemRepo = cartItemRepo ?? throw new ArgumentNullException(nameof(cartItemRepo));
             _cartRepo = cartRepo ?? throw new ArgumentNullException(nameof(cartRepo));
@@ -36,6 +38,7 @@ namespace PipeVolt_BLL.Services
             _cartItemGenericRepo = cartItemGenericRepo ?? throw new ArgumentNullException(nameof(cartItemGenericRepo));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         public async Task<IEnumerable<CartItemDto>> GetCartItemsByCartIdAsync(int cartId)
@@ -95,6 +98,7 @@ namespace PipeVolt_BLL.Services
                         LineTotal = dto.Quantity * (product.SellingPrice ?? 0) 
                     };
                     await _cartItemGenericRepo.Create(existingItem);
+                    UpdateCartQuantityCache(cartId, dto.Quantity);
                     _logger.LogInformation($"Created new cart item {existingItem.CartItemId}");
                 }
 
@@ -181,5 +185,18 @@ namespace PipeVolt_BLL.Services
                 throw;
             }
         }
+        private void UpdateCartQuantityCache(int cartId, int quantityChange)
+        {
+            var key = $"cart_quantity_{cartId}";
+
+            int currentQuantity = _cache.GetOrCreate(key, entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30);
+                return 0;
+            });
+
+            _cache.Set(key, currentQuantity + quantityChange);
+        }
+
     }
 }

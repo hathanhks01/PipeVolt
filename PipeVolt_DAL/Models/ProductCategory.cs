@@ -19,6 +19,10 @@ public partial class ProductCategory
 
     [Column("description")]
     public string? Description { get; set; }
+  
+    [Column("image_url")]
+    [StringLength(255)]
+    public string? ImageUrl { get; set; }
 
     [InverseProperty("Category")]
     public virtual ICollection<Product> Products { get; set; } = new List<Product>();

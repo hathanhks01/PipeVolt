@@ -39,7 +39,7 @@ namespace PipeVolt_Api.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<ProductCategoryDto>> Create([FromBody] CreateProductCategoryDto dto)
+        public async Task<ActionResult<CreateProductCategoryDto>> Create([FromForm] CreateProductCategoryDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
             var created = await _service.CreateAsync(dto);
@@ -47,7 +47,7 @@ namespace PipeVolt_Api.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<ActionResult<ProductCategoryDto>> Update(int id, [FromBody] UpdateProductCategoryDto dto)
+        public async Task<ActionResult<UpdateBrandDto>> Update(int id, [FromForm] UpdateProductCategoryDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
             if (id != dto.CategoryId) return BadRequest("ID mismatch");

@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using PipeVolt_Api.Common;
 using PipeVolt_Api.Common.Repository;
 using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.DTOS;
@@ -51,6 +52,19 @@ namespace PipeVolt_BLL.Services
         {
             _logger.LogInformation($"Creating category {dto.CategoryName}");
             var entity = _mapper.Map<ProductCategory>(dto);
+            if (dto.ImageFile != null)
+            {
+                try
+                {
+                    string imagePath = CommonFunctions.UploadFile(dto.ImageFile, "images/categories");
+                    entity.ImageUrl = imagePath;
+                }
+                catch (ArgumentException ex)
+                {
+                    _logger.LogError("Image upload failed", ex);
+                    throw new InvalidOperationException("Failed to upload image: " + ex.Message);
+                }
+            }
             var created = await _repo.Create(entity);
             return _mapper.Map<ProductCategoryDto>(created);
         }
@@ -63,6 +77,19 @@ namespace PipeVolt_BLL.Services
             var entity = query.FirstOrDefault();
             if (entity == null) throw new KeyNotFoundException("Category not found");
             _mapper.Map(dto, entity);
+            if (dto.ImageFile != null)
+            {
+                try
+                {
+                    string imagePath = CommonFunctions.UploadFile(dto.ImageFile, "images/products");
+                    entity.ImageUrl = imagePath;
+                }
+                catch (ArgumentException ex)
+                {
+                    _logger.LogError("Image upload failed", ex);
+                    throw new InvalidOperationException("Failed to upload image: " + ex.Message);
+                }
+            }
             await _repo.Update(entity);
             return _mapper.Map<ProductCategoryDto>(entity);
         }
