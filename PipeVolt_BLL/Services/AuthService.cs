@@ -13,6 +13,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
+using static PipeVolt_DAL.Common.DataType;
 
 namespace PipeVolt_BLL.Services
 {
@@ -110,9 +111,9 @@ namespace PipeVolt_BLL.Services
                 {
                     Username = registerDTO.Username,
                     Password = HashedPassword,
-                    UserType = 2,
+                    UserType = (int)UserType.Customer,
                     CustomerId = customer.CustomerId,
-                    Status = 1
+                    Status = (int)UserStatus.Active
                 };
                 await _UserGenericRepository.Create(user);
                 _logger.LogInformation($"User {registerDTO.Username} registered successfully");
@@ -177,7 +178,7 @@ namespace PipeVolt_BLL.Services
         }
         private bool IsValidUserType(int userType)
         {
-            return userType >= 0 && userType <= 2;
+            return Enum.IsDefined(typeof(UserType), userType);
         }
     }
 }

@@ -43,10 +43,6 @@ public partial class SalesOrder
     [StringLength(50)]
     public string? Status { get; set; }
 
-    [Column("payment_method")]
-    [StringLength(50)]
-    public string? PaymentMethod { get; set; }
-
     [ForeignKey("CustomerId")]
     [InverseProperty("SalesOrders")]
     public virtual Customer? Customer { get; set; }
@@ -57,4 +53,14 @@ public partial class SalesOrder
 
     [InverseProperty("Order")]
     public virtual ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();
+    [Column("payment_method_id")]
+    public int? PaymentMethodId { get; set; }
+
+    [ForeignKey("PaymentMethodId")]
+    [InverseProperty("SalesOrders")]
+    public virtual PaymentMethod? PaymentMethod { get; set; }
+    [InverseProperty("Order")] 
+    public virtual ICollection<PaymentTransaction> PaymentTransactions { get; set; }
+    [InverseProperty("Order")]
+    public virtual ICollection<Invoice>? Invoices { get; set; } = new List<Invoice>();
 }

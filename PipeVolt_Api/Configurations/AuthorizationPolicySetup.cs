@@ -1,6 +1,8 @@
-﻿using Microsoft.IdentityModel.Tokens;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using PipeVolt_DAL.Common; // Thêm using cho enums
 using System.Text;
+using static PipeVolt_DAL.Common.DataType;
 
 namespace PipeVolt_Api.Configurations
 {
@@ -10,23 +12,25 @@ namespace PipeVolt_Api.Configurations
         {
             services.AddAuthorization(options =>
             {
-                // Policy for Admin only (UserType = 0)
+                // Policy for Admin only
                 options.AddPolicy("RequireAdmin", policy =>
-                    policy.RequireClaim("userType", "0"));
+                    policy.RequireClaim("userType", ((int)UserType.Admin).ToString()));
 
-                // Policy for Employee only (UserType = 1)
+                // Policy for Employee only
                 options.AddPolicy("RequireEmployee", policy =>
-                    policy.RequireClaim("userType", "1"));
+                    policy.RequireClaim("userType", ((int)UserType.Employee).ToString()));
 
-                // Policy for Customer only (UserType = 2)
+                // Policy for Customer only
                 options.AddPolicy("RequireCustomer", policy =>
-                    policy.RequireClaim("userType", "2"));
+                    policy.RequireClaim("userType", ((int)UserType.Customer).ToString()));
 
-                // Policy for Admin and Employee (UserType = 0 or 1)
+                // Policy for Admin and Employee
                 options.AddPolicy("RequireAdminOrEmployee", policy =>
                     policy.RequireAssertion(context =>
                         context.User.HasClaim(c =>
-                            c.Type == "userType" && (c.Value == "0" || c.Value == "1"))));
+                            c.Type == "userType" &&
+                            (c.Value == ((int)UserType.Admin).ToString() ||
+                             c.Value == ((int)UserType.Employee).ToString()))));
             });
         }
 

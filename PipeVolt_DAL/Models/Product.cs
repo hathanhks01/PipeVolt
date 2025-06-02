@@ -43,11 +43,11 @@ public partial class Product
 
     [ForeignKey("BrandId")]
     [InverseProperty("Products")]
-    public virtual Brand? Brand { get; set; } = null!;
+    public virtual Brand? Brand { get; set; }
 
     [ForeignKey("CategoryId")]
     [InverseProperty("Products")]
-    public virtual ProductCategory? Category { get; set; } = null!;
+    public virtual ProductCategory? Category { get; set; }
 
     [InverseProperty("Product")]
     public virtual ICollection<Inventory> Inventories { get; set; } = new List<Inventory>();
@@ -65,4 +65,6 @@ public partial class Product
 
     [InverseProperty("Product")]
     public virtual ICollection<Warranty> Warranties { get; set; } = new List<Warranty>();
+    [InverseProperty("Product")]
+    public virtual ICollection<InvoiceDetail>? InvoiceDetails { get; set; } = new List<InvoiceDetail>();
 }

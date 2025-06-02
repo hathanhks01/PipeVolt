@@ -123,6 +123,9 @@ public class AutoMapperProfiles : Profile
         CreateMap<CreateUserAccountDto, UserAccount>()
             .ForMember(dest => dest.UserId, opt => opt.Ignore());
         CreateMap<UpdateUserAccountDto, UserAccount>()
-            .ForMember(dest => dest.UserId, opt => opt.Ignore());
+    .ForMember(dest => dest.UserId, opt => opt.Ignore())
+    .ForMember(dest => dest.Password, opt =>
+        opt.Condition(src => !string.IsNullOrWhiteSpace(src.Password)));
+
     }
 }

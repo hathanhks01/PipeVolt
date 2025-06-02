@@ -316,7 +316,7 @@ namespace PipeVolt_BLL.Services
                     CustomerId = customerId,
                     OrderDate = DateTime.Now,
                     Status = "Pending",
-                    PaymentMethod = "Cash", // Có thể thay đổi
+                   // PaymentMethod = "Cash", // Có thể thay đổi
                     OrderCode = $"SO-{DateTime.Now.Ticks}"
                 };
 

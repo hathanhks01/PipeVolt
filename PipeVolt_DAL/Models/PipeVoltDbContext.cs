@@ -45,6 +45,10 @@ public partial class PipeVoltDbContext : DbContext
     public virtual DbSet<Warehouse> Warehouses { get; set; }
 
     public virtual DbSet<Warranty> Warranties { get; set; }
+    public virtual DbSet<PaymentMethod> PaymentMethods { get; set; }
+    public virtual DbSet<PaymentTransaction> PaymentTransactions { get; set; }
+    public virtual DbSet<Invoice> Invoices { get; set; }
+    public virtual DbSet<InvoiceDetail> InvoiceDetails { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
@@ -212,6 +216,42 @@ public partial class PipeVoltDbContext : DbContext
             entity.HasOne(d => d.Product).WithMany(p => p.Warranties)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__WARRANTY__produc__70DDC3D8");
+        });
+        modelBuilder.Entity<PaymentMethod>(entity =>
+        {
+            entity.HasKey(e => e.PaymentMethodId).HasName("PK__PAYMENT_METHOD__E8C9B7A3");
+            entity.Property(e => e.PaymentMethodId).ValueGeneratedOnAdd();
+        });
+
+        modelBuilder.Entity<PaymentTransaction>(entity =>
+        {
+            entity.HasKey(e => e.TransactionId).HasName("PK__PAYMENT_TRANSACTION__A1C3D8F2");
+            entity.HasOne(d => d.Order)
+                .WithMany(p => p.PaymentTransactions)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK__PAYMENT_TRANS__order__7A672E12");
+            entity.HasOne(d => d.PaymentMethod)
+                .WithMany(p => p.PaymentTransactions)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK__PAYMENT_TRANS__method__7B573F34");
+        });
+        modelBuilder.Entity<Invoice>(entity =>
+        {
+            entity.HasKey(e => e.InvoiceId).HasName("PK__INVOICE__ID");
+            entity.Property(e => e.InvoiceId).ValueGeneratedOnAdd();
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getdate())");
+
+            entity.HasOne(d => d.Order).WithMany(p => p.Invoices)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+            entity.HasOne(d => d.Customer).WithMany(p => p.Invoices)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+        });
+
+        modelBuilder.Entity<InvoiceDetail>(entity =>
+        {
+            entity.HasKey(e => e.InvoiceDetailId).HasName("PK__INVOICE_DETAIL__ID");
+            entity.Property(e => e.LineTotal)
+                .HasComputedColumnSql("(([quantity]*[unit_price])-isnull([discount],0))", false);
         });
 
         OnModelCreatingPartial(modelBuilder);
