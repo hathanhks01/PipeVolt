@@ -200,27 +200,6 @@ namespace PipeVolt_Api.Controllers
             }
         }
 
-        /// <summary>
-        /// Thanh toán giỏ hàng và tạo đơn hàng
-        /// </summary>
-        /// <param name="customerId">ID của khách hàng</param>
-        /// <returns>ID của SalesOrder vừa tạo</returns>
-        [HttpPost("{customerId}/checkout")]
-        public async Task<ActionResult<int>> Checkout(int customerId)
-        {
-            try
-            {
-                var orderId = await _cartService.CheckoutAsync(customerId);
-                return Ok(orderId);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
-        }
+       
     }
 }

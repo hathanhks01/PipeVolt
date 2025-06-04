@@ -83,7 +83,10 @@ builder.Services.AddScoped<IGenericRepository<Cart>, CartRepository>();
 builder.Services.AddScoped<IGenericRepository<CartItem>, CartItemRepository>();
 builder.Services.AddScoped<ICartRepository,CartRepository>();
 builder.Services.AddScoped<ICartItemRepository,CartItemRepository>();
-
+builder.Services.AddScoped<IGenericRepository<Invoice>, InvoiceRepository>();
+builder.Services.AddScoped<IGenericRepository<InvoiceDetail>, InvoiceDetailRepository>();
+builder.Services.AddScoped<IGenericRepository<PaymentMethod>, PaymentMethodRepository>();
+builder.Services.AddScoped<IGenericRepository<PaymentTransaction>, PaymentTransactionRepository>();
 // Services
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IOrderDetailService, OrderDetailService>();
@@ -97,7 +100,7 @@ builder.Services.AddScoped<IWarrantyService, WarrantyService>();
 builder.Services.AddScoped<ICartItemService, CartItemService>();
 builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IUserAccountService, UserAccountService>();
-
+builder.Services.AddScoped<ICheckoutService,CheckoutService>();
 // Logger
 builder.Services.AddScoped<ILoggerService, LoggerService>();
 

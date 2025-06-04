@@ -1,5 +1,7 @@
 ﻿using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 using PipeVolt_Api.Common.Repository;
+using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.DTOS;
 using PipeVolt_DAL.Models;
 using System;
@@ -8,20 +10,23 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PipeVolt_BLL.IServices
+namespace PipeVolt_BLL.Services
 {
     public class InventoryService : IInventoryService
     {
         private readonly IGenericRepository<Inventory> _repo;
+        private readonly IGenericRepository<Warehouse> _warehouseRepo;
         private readonly ILoggerService _logger;
         private readonly IMapper _mapper;
 
         public InventoryService(
             IGenericRepository<Inventory> repo,
+            IGenericRepository<Warehouse> warehouseRepo,
             ILoggerService logger,
             IMapper mapper)
         {
             _repo = repo ?? throw new ArgumentNullException(nameof(repo));
+            _warehouseRepo = warehouseRepo ?? throw new ArgumentNullException(nameof(warehouseRepo));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         }
@@ -42,7 +47,57 @@ namespace PipeVolt_BLL.IServices
                 throw;
             }
         }
+        public async Task<List<ProductDto>> GetInventoriesByWarehouseCodeAsync(string warehouseCode)
+        {
+            if (string.IsNullOrWhiteSpace(warehouseCode))
+            {
+                _logger.LogWarning("Mã kho hàng không được để trống.");
+                throw new ArgumentException("Mã kho hàng không được để trống.");
+            }
 
+            _logger.LogInformation($"Đang lấy danh sách sản phẩm trong tồn kho cho kho {warehouseCode}");
+
+            try
+            {
+                // 1. Tìm Warehouse theo WarehouseCode
+                var warehouseQuery = await _warehouseRepo.QueryBy(w => w.WarehouseCode == warehouseCode);
+                var warehouse = await warehouseQuery.FirstOrDefaultAsync();
+
+                if (warehouse == null)
+                {
+                    _logger.LogWarning($"Không tìm thấy kho hàng với mã {warehouseCode}");
+                    throw new KeyNotFoundException($"Kho hàng với mã {warehouseCode} không tồn tại.");
+                }
+
+                // 2. Tìm Inventory theo WarehouseId và lấy Product
+                var inventoryQuery = await _repo.QueryBy(i => i.WarehouseId == warehouse.WarehouseId);
+                var products = await inventoryQuery
+                    .Include(i => i.Product)
+                        .ThenInclude(p => p.Category)
+                    .Include(i => i.Product)
+                        .ThenInclude(p => p.Brand)
+                    .Select(i => i.Product)
+                    .Distinct()
+                    .ToListAsync();
+
+                if (!products.Any())
+                {
+                    _logger.LogWarning($"Không tìm thấy sản phẩm tồn kho nào trong kho {warehouseCode}");
+                    throw new KeyNotFoundException($"Không có sản phẩm nào trong tồn kho của kho {warehouseCode}.");
+                }
+
+                // 3. Map sang ProductDto
+                var result = _mapper.Map<List<ProductDto>>(products);
+                _logger.LogInformation($"Đã lấy {result.Count} sản phẩm trong tồn kho của kho {warehouseCode}");
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Lỗi khi lấy danh sách sản phẩm trong tồn kho cho kho {warehouseCode}", ex);
+                throw;
+            }
+        }
         public async Task<InventoryDto> GetInventoryByIdAsync(int id)
         {
             try
@@ -65,7 +120,23 @@ namespace PipeVolt_BLL.IServices
                 throw;
             }
         }
-
+       
+        public async Task<List<InventoryDto>> GetInventoriesBywarehouseIdAsync(int WarehouseId)
+        {
+            try
+            {
+                _logger.LogInformation($"Fetching inventories for warehouse ID {WarehouseId}");
+                var inventories = await _repo.QueryBy(x => x.WarehouseId == WarehouseId);
+                var result = _mapper.Map<List<InventoryDto>>(inventories.Include(p=>p.ProductId).Include(w=>w.WarehouseId));
+                _logger.LogInformation($"Fetched {result.Count} inventories for product ID {WarehouseId}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error fetching inventories for product ID {WarehouseId}", ex);
+                throw;
+            }
+        }
         public async Task<InventoryDto> AddInventoryAsync(CreateInventoryDto dto)
         {
             if (dto == null)

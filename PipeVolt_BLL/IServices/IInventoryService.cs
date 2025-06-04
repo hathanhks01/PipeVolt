@@ -5,6 +5,7 @@ namespace PipeVolt_BLL.IServices
     public interface IInventoryService
     {
         Task<InventoryDto> AddInventoryAsync(CreateInventoryDto dto);
+        Task<List<ProductDto>> GetInventoriesByWarehouseCodeAsync(string warehouseCode);
         Task<bool> DeleteInventoryAsync(int id);
         Task<List<InventoryDto>> GetAllInventoriesAsync();
         Task<InventoryDto> GetInventoryByIdAsync(int id);

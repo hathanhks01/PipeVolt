@@ -10,5 +10,6 @@ namespace PipeVolt_BLL.Services
         Task<IEnumerable<ProductDto>> GetPopularProductsAsync();
         Task<ProductDto> GetProductByIdAsync(int productId);
         Task<ProductDto> UpdateProductAsync(int productId, UpdateProductDto productDto);
+        Task<List<ProductDto>> GetProductsByCategoryIdAsync(int categoryId);
     }
 }

@@ -12,7 +12,8 @@ public partial class Warehouse
     [Key]
     [Column("warehouse_id")]
     public int WarehouseId { get; set; }
-
+    public string WarehouseCode { get; set; } 
+    
     [Column("warehouse_name")]
     [StringLength(100)]
     public string? WarehouseName { get; set; }

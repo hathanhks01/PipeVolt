@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PipeVolt_BLL.IServices;
+using PipeVolt_BLL.Services;
 using PipeVolt_DAL.DTOS;
 
 namespace PipeVolt_Api.Controllers
@@ -21,7 +22,32 @@ namespace PipeVolt_Api.Controllers
             try { return Ok(await _service.GetInventoryByIdAsync(id)); }
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
         }
-
+        /// <summary>
+        /// Lấy danh sách sản phẩm tồn kho theo mã kho hàng
+        /// </summary>
+        /// <param name="warehouseCode">Mã kho hàng (WarehouseCode)</param>
+        /// <returns>Danh sách sản phẩm tồn kho</returns>
+        [HttpGet("warehouse/code/{warehouseCode}")]
+        public async Task<ActionResult<List<ProductDto>>> GetInventoriesByWarehouseCode(string warehouseCode)
+        {
+            try
+            {
+                var inventories = await _service.GetInventoriesByWarehouseCodeAsync(warehouseCode);
+                return Ok(inventories);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi máy chủ: {ex.Message}");
+            }
+        }
         [HttpPost]
         public async Task<ActionResult<InventoryDto>> Create(CreateInventoryDto dto)
         {

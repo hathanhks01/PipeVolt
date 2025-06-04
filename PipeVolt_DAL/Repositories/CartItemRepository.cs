@@ -20,5 +20,14 @@ namespace PipeVolt_DAL.Repositories
             var query = await QueryBy(ci => ci.CartId == cartId && ci.ProductId == productId);
             return await query.FirstOrDefaultAsync();
         }
+        public async Task DeleteRange(Func<CartItem, bool> predicate)
+        {
+            var itemsToDelete = await QueryBy(ci => predicate(ci));
+            if (!await itemsToDelete.AnyAsync())
+            {
+                throw new InvalidOperationException("Không có mục nào để xóa.");
+            }
+            await base.DeleteRange(ci => predicate(ci));
+        }
     }
 }

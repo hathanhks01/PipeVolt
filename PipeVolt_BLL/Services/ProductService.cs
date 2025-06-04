@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 using PipeVolt_Api.Common;
 using PipeVolt_Api.Common.Repository;
 using PipeVolt_BLL.IServices;
@@ -14,15 +15,18 @@ namespace PipeVolt_BLL.Services
     public class ProductService : IProductService
     {
         private readonly IGenericRepository<Product> _repo;
+        private readonly IGenericRepository<ProductCategory> _categoryRepo;
         private readonly IMapper _mapper;
         private readonly ILoggerService _logger;
 
         public ProductService(
             IGenericRepository<Product> repo,
+            IGenericRepository<ProductCategory> categoryRepo,
             IMapper mapper,
             ILoggerService logger)
         {
             _repo = repo;
+            _categoryRepo = categoryRepo ?? throw new ArgumentNullException(nameof(categoryRepo));
             _mapper = mapper;
             _logger = logger;
         }
@@ -174,6 +178,51 @@ namespace PipeVolt_BLL.Services
                 throw;
             }
         }
+        // Phương thức mới: Lọc sản phẩm theo CategoryId
+        public async Task<List<ProductDto>> GetProductsByCategoryIdAsync(int categoryId)
+        {
+            if (categoryId <= 0)
+            {
+                _logger.LogWarning("CategoryId không hợp lệ.");
+                throw new ArgumentException("CategoryId phải lớn hơn 0.");
+            }
 
+            _logger.LogInformation($"Đang lấy danh sách sản phẩm thuộc danh mục {categoryId}");
+
+            try
+            {
+                // Kiểm tra danh mục tồn tại
+                var categoryQuery = await _categoryRepo.QueryBy(c => c.CategoryId == categoryId);
+                var category = await categoryQuery.FirstOrDefaultAsync();
+                if (category == null)
+                {
+                    _logger.LogWarning($"Không tìm thấy danh mục với ID {categoryId}");
+                    throw new KeyNotFoundException($"Danh mục với ID {categoryId} không tồn tại.");
+                }
+
+                // Lấy sản phẩm theo CategoryId
+                var productQuery = await _repo.QueryBy(p => p.CategoryId == categoryId);
+                var products = await productQuery
+                    .Include(p => p.Category)
+                    .Include(p => p.Brand)
+                    .ToListAsync();
+
+                if (!products.Any())
+                {
+                    _logger.LogWarning($"Không tìm thấy sản phẩm nào thuộc danh mục {categoryId}");
+                    throw new KeyNotFoundException($"Không có sản phẩm nào thuộc danh mục {categoryId}.");
+                }
+
+                var result = _mapper.Map<List<ProductDto>>(products);
+                _logger.LogInformation($"Đã lấy {result.Count} sản phẩm thuộc danh mục {categoryId}");
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Lỗi khi lấy danh sách sản phẩm thuộc danh mục {categoryId}", ex);
+                throw;
+            }
+        }
     }
 }

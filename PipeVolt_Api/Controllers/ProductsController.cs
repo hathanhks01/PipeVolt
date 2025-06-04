@@ -87,5 +87,32 @@ namespace PipeVolt.Controllers
                 return NotFound();
             }
         }
+        /// <summary>
+        /// Lấy danh sách sản phẩm theo danh mục
+        /// </summary>
+        /// <param name="categoryId">ID của danh mục</param>
+        /// <returns>Danh sách sản phẩm</returns>
+        [HttpGet]
+        [HttpGet("category")]
+        public async Task<ActionResult<List<ProductDto>>> GetProductsByCategory([FromQuery] int categoryId)
+        {
+            try
+            {
+                var products = await _productService.GetProductsByCategoryIdAsync(categoryId);
+                return Ok(products);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi máy chủ: {ex.Message}");
+            }
+        }
     }
 }
