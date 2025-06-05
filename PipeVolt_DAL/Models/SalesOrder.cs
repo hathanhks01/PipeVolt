@@ -40,8 +40,7 @@ public partial class SalesOrder
     public double? NetAmount { get; set; }
 
     [Column("status")]
-    [StringLength(50)]
-    public string? Status { get; set; }
+    public int? Status { get; set; }
 
     [ForeignKey("CustomerId")]
     [InverseProperty("SalesOrders")]

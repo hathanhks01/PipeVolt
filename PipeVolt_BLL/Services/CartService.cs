@@ -8,6 +8,7 @@ using PipeVolt_DAL.Repositories;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using static PipeVolt_DAL.Common.DataType;
 
 namespace PipeVolt_BLL.Services
 {
@@ -315,7 +316,7 @@ namespace PipeVolt_BLL.Services
                 {
                     CustomerId = customerId,
                     OrderDate = DateTime.Now,
-                    Status = "Pending",
+                    Status = (int)SaleStatus.Pending,
                    // PaymentMethod = "Cash", // Có thể thay đổi
                     OrderCode = $"SO-{DateTime.Now.Ticks}"
                 };

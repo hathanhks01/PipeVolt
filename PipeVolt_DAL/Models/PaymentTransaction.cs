@@ -32,8 +32,8 @@ namespace PipeVolt_DAL.Models
         public DateTime TransactionDate { get; set; } = DateTime.Now;
 
         [Column("status")]
-        [StringLength(50)]
-        public string? Status { get; set; } // Ví dụ: Success, Pending, Failed
+      
+        public int? Status { get; set; } 
 
         [Column("gateway_response")]
         public string? GatewayResponse { get; set; } // Phản hồi từ cổng thanh toán

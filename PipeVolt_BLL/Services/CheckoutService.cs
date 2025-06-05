@@ -7,7 +7,9 @@ using PipeVolt_DAL.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.AccessControl;
 using System.Threading.Tasks;
+using static PipeVolt_DAL.Common.DataType;
 
 namespace PipeVolt_BLL.Services
 {
@@ -116,7 +118,7 @@ namespace PipeVolt_BLL.Services
                         DiscountAmount = 0, // Có thể thêm logic giảm giá
                         TaxAmount = cart.CartItems.Sum(ci => ci.LineTotal) * 0.1, // Giả sử thuế 10%
                         NetAmount = cart.CartItems.Sum(ci => ci.LineTotal) * 1.1, // Tổng sau thuế
-                        Status = "Pending",
+                        Status = (int)SaleStatus.Completed,
                         PaymentMethodId = paymentMethodId
                     };
 
@@ -180,7 +182,7 @@ namespace PipeVolt_BLL.Services
                         TransactionCode = GenerateTransactionCode(),
                         Amount = salesOrder.NetAmount ?? 0,
                         TransactionDate = DateTime.Now,
-                        Status = "Success" // Giả sử thanh toán thành công
+                        Status = (int)PaymentTransactionStatus.Suscess // Giả sử thanh toán thành công
                     };
 
                     await _paymentTransactionRepo.Create(paymentTransaction);
@@ -276,7 +278,7 @@ namespace PipeVolt_BLL.Services
                         DiscountAmount = 0,
                         TaxAmount = selectedCartItems.Sum(ci => ci.LineTotal) * 0.1,
                         NetAmount = selectedCartItems.Sum(ci => ci.LineTotal) * 1.1,
-                        Status = "Pending",
+                        Status = (int)SaleStatus.Pending,
                         PaymentMethodId = paymentMethodId
                     };
 
@@ -303,7 +305,7 @@ namespace PipeVolt_BLL.Services
                         TransactionCode = GenerateTransactionCode(),
                         Amount = salesOrder.NetAmount ?? 0,
                         TransactionDate = DateTime.Now,
-                        Status = "Pending"
+                        Status = (int)SaleStatus.Pending
                     };
 
                     await _paymentTransactionRepo.Create(paymentTransaction);
@@ -313,8 +315,8 @@ namespace PipeVolt_BLL.Services
 
                     if (!paymentSuccess)
                     {
-                        paymentTransaction.Status = "Failed";
-                        salesOrder.Status = "Pending";
+                        paymentTransaction.Status = (int)PaymentTransactionStatus.Failed;
+                        salesOrder.Status =(int)SaleStatus.Pending;
                         await _paymentTransactionRepo.Update(paymentTransaction);
                         await _salesOrderRepo.Update(salesOrder);
                         await transaction.CommitAsync();
@@ -323,8 +325,8 @@ namespace PipeVolt_BLL.Services
                     }
 
                     // 8. Cập nhật trạng thái thanh toán thành công
-                    paymentTransaction.Status = "Success";
-                    salesOrder.Status = "Paid";
+                    paymentTransaction.Status = (int)PaymentTransactionStatus.Suscess;
+                    salesOrder.Status = (int)SaleStatus.Paid;
                     await _paymentTransactionRepo.Update(paymentTransaction);
                     // 9. Tạo Invoice
                     var invoice = new Invoice

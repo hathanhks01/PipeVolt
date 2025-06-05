@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static PipeVolt_DAL.Common.DataType;
 
 namespace PipeVolt_BLL.Services
 {
@@ -161,9 +162,10 @@ namespace PipeVolt_BLL.Services
             {
                 CustomerId = checkoutDto.CustomerId,
                 OrderDate = DateTime.UtcNow,
-                Status = "Pending",
+                Status = (int)SaleStatus.Pending,
                 PaymentMethodId = checkoutDto.PaymentMethodId,
                 TotalAmount = totalAmount,
+                
             };
 
             await _repo.Create(salesOrder);
@@ -185,7 +187,9 @@ namespace PipeVolt_BLL.Services
             if (cartItemIds.Any())
             {
                 _logger.LogInformation("Deleting cart items after checkout");
-                var cartItems = await _repoCartItem.QueryBy(x => cartItemIds.Contains(x.CartItemId));
+                var cartItemsQueryable = await _repoCartItem.QueryBy(x => cartItemIds.Contains(x.CartItemId));
+                var cartItems = cartItemsQueryable.ToList(); // Đọc hết dữ liệu vào bộ nhớ, đóng DataReader
+
                 foreach (var cartItem in cartItems)
                 {
                     await _repoCartItem.Delete(cartItem);

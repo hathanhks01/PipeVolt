@@ -19,7 +19,7 @@ namespace PipeVolt_DAL.DTOS
         public double? DiscountAmount { get; set; }
         public double? TaxAmount { get; set; }
         public double? NetAmount { get; set; }
-        public string? Status { get; set; }
+        public int? Status { get; set; }
         public string? PaymentMethod { get; set; }
     }
     public class CheckoutDto
@@ -45,7 +45,7 @@ namespace PipeVolt_DAL.DTOS
         public double? TotalAmount { get; set; }
         public double? DiscountAmount { get; set; }
         public double? TaxAmount { get; set; }
-        public string? Status { get; set; }
+        public int? Status { get; set; }
         public string? PaymentMethod { get; set; }
     }
     public class UpdateSalesOrderDto
@@ -57,7 +57,7 @@ namespace PipeVolt_DAL.DTOS
         public double? TotalAmount { get; set; }
         public double? DiscountAmount { get; set; }
         public double? TaxAmount { get; set; }
-        public string? Status { get; set; }
+        public int? Status { get; set; }
         public string? PaymentMethod { get; set; }
     }
 }

@@ -20,5 +20,19 @@ namespace PipeVolt_DAL.Common
             Active = 1,
             Suspended = 2
         }
+        public enum SaleStatus
+        {
+            Pending = 0,
+            Completed = 1,
+            Cancelled = 2,
+            Paid=3
+        }
+        public enum PaymentTransactionStatus
+        {
+            Pending = 0,
+            Suscess = 1,
+            Failed = 2
+        }
+      
     }
 }
