@@ -24,6 +24,11 @@ namespace PipeVolt_DAL.DTOS
         public string CategoryName { get; set; } = null!; // Thêm thông tin của Category
         public string BrandName { get; set; } = null!;    // Thêm thông tin của Brand
     }
+    public class InventoryProductDto
+    {
+        public ProductDto Product { get; set; }
+        public int Quantity { get; set; }
+    }
     public class CreateProductDto
     {
         [Required]

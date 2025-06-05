@@ -43,6 +43,15 @@ namespace PipeVolt_Api.Controllers
             await _service.DeleteSalesOrderAsync(id);
             return NoContent();
         }
+        [HttpPost("Checkout")]
+        public async Task<IActionResult> Checkout([FromBody] CheckoutDto dto)
+        {
+            if (dto == null || dto.Items == null || !dto.Items.Any())
+                return BadRequest("Checkout items cannot be empty.");
+
+            await _service.Checkout(dto);
+            return Ok(new { message = "Checkout successful" });
+        }
     }
 
 }

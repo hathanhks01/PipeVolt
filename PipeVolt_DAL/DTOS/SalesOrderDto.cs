@@ -22,6 +22,21 @@ namespace PipeVolt_DAL.DTOS
         public string? Status { get; set; }
         public string? PaymentMethod { get; set; }
     }
+    public class CheckoutDto
+    {
+        public int CustomerId { get; set; } 
+        public List<CheckoutItemDto> Items { get; set; }
+        public int? PaymentMethodId { get; set; }
+        public string? Note { get; set; }
+    }
+
+    public class CheckoutItemDto
+    {
+        public int CartItemId { get; set; }
+        public int ProductId { get; set; }
+        public int Quantity { get; set; }
+        public double UnitPrice { get; set; }
+    }
     public class CreateSalesOrderDto
     {
         public string? OrderCode { get; set; }

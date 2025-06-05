@@ -14,15 +14,21 @@ namespace PipeVolt_BLL.Services
     public class SalesOrderService : ISalesOrderService
     {
         private readonly IGenericRepository<SalesOrder> _repo;
+        private readonly IGenericRepository<OrderDetail> _repoOrderDetail;
+        private readonly IGenericRepository<CartItem> _repoCartItem;
         private readonly ILoggerService _logger;
         private readonly IMapper _mapper;
 
         public SalesOrderService(
             IGenericRepository<SalesOrder> repo,
+            IGenericRepository<CartItem> repoCartItem,
+            IGenericRepository<OrderDetail> repoOrderDetail,
             ILoggerService logger,
             IMapper mapper)
         {
             _repo = repo ?? throw new ArgumentNullException(nameof(repo));
+            _repoCartItem = repoCartItem ?? throw new ArgumentNullException(nameof(repoCartItem));
+            _repoOrderDetail = repoOrderDetail ?? throw new ArgumentNullException(nameof(repoOrderDetail));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         }
@@ -136,6 +142,55 @@ namespace PipeVolt_BLL.Services
             {
                 _logger.LogError($"Error deleting sales order ID {id}", ex);
                 throw;
+            }
+        }
+        public async Task Checkout(CheckoutDto checkoutDto)
+        {
+            if (checkoutDto == null || checkoutDto.Items == null || !checkoutDto.Items.Any())
+            {
+                _logger.LogWarning("Invalid checkout request: no items provided");
+                throw new ArgumentException("Checkout items cannot be empty.");
+            }
+
+            _logger.LogInformation("Adding new sales order");
+
+            // Tính tổng tiền
+            double totalAmount = checkoutDto.Items.Sum(i => i.UnitPrice * i.Quantity);
+
+            var salesOrder = new SalesOrder
+            {
+                CustomerId = checkoutDto.CustomerId,
+                OrderDate = DateTime.UtcNow,
+                Status = "Pending",
+                PaymentMethodId = checkoutDto.PaymentMethodId,
+                TotalAmount = totalAmount,
+            };
+
+            await _repo.Create(salesOrder);
+            _logger.LogInformation("Add new sales order success");
+
+            foreach (var item in checkoutDto.Items)
+            {
+                var orderDetail = new OrderDetail
+                {
+                    OrderId = salesOrder.OrderId, 
+                    ProductId = item.ProductId,
+                    Quantity = item.Quantity,
+                    UnitPrice = item.UnitPrice
+                };
+                await _repoOrderDetail.Create(orderDetail);
+            }
+
+            var cartItemIds = checkoutDto.Items.Select(i => i.CartItemId).ToList();
+            if (cartItemIds.Any())
+            {
+                _logger.LogInformation("Deleting cart items after checkout");
+                var cartItems = await _repoCartItem.QueryBy(x => cartItemIds.Contains(x.CartItemId));
+                foreach (var cartItem in cartItems)
+                {
+                    await _repoCartItem.Delete(cartItem);
+                }
+                _logger.LogInformation("Deleted cart items after checkout");
             }
         }
     }

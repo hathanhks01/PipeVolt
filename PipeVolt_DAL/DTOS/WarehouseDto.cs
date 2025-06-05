@@ -16,6 +16,11 @@ namespace PipeVolt_DAL.DTOS
         public string? WarehouseName { get; set; }
         public string? Address { get; set; }
     }
+    public class ReceivePurchaseOrderDto
+    {
+        public string WarehouseCode { get; set; } = string.Empty;
+        public int PurchaseOrderId { get; set; }
+    }
     public class CreateWarehouseDto
     {
         [Required] public string WarehouseName { get; set; } = string.Empty;
