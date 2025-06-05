@@ -28,7 +28,7 @@ namespace PipeVolt_Api.Controllers
         /// <param name="warehouseCode">Mã kho hàng (WarehouseCode)</param>
         /// <returns>Danh sách sản phẩm tồn kho</returns>
         [HttpGet("warehouse/code/{warehouseCode}")]
-        public async Task<ActionResult<List<ProductDto>>> GetInventoriesByWarehouseCode(string warehouseCode)
+        public async Task<ActionResult<List<InventoryProductDto>>> GetInventoriesByWarehouseCode(string warehouseCode)
         {
             try
             {
@@ -47,6 +47,13 @@ namespace PipeVolt_Api.Controllers
             {
                 return StatusCode(500, $"Lỗi máy chủ: {ex.Message}");
             }
+        }
+
+        [HttpPost("ReceiveFromPurchaseOrder")]
+        public async Task<IActionResult> ReceiveFromPurchaseOrder([FromBody] ReceivePurchaseOrderDto dto)
+        {
+            await _service.ReceiveFromPurchaseOrderAsync(dto.WarehouseCode, dto.PurchaseOrderId);
+            return Ok("Nhập kho thành công từ đơn hàng mua.");
         }
         [HttpPost]
         public async Task<ActionResult<InventoryDto>> Create(CreateInventoryDto dto)

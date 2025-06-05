@@ -16,17 +16,20 @@ namespace PipeVolt_BLL.Services
     {
         private readonly IGenericRepository<Inventory> _repo;
         private readonly IGenericRepository<Warehouse> _warehouseRepo;
+        private readonly IGenericRepository<PurchaseOrder> _PurchaseOrderRepo;
         private readonly ILoggerService _logger;
         private readonly IMapper _mapper;
 
         public InventoryService(
             IGenericRepository<Inventory> repo,
             IGenericRepository<Warehouse> warehouseRepo,
+            IGenericRepository<PurchaseOrder> PurchaseOrderRepo,
             ILoggerService logger,
             IMapper mapper)
         {
             _repo = repo ?? throw new ArgumentNullException(nameof(repo));
             _warehouseRepo = warehouseRepo ?? throw new ArgumentNullException(nameof(warehouseRepo));
+            _PurchaseOrderRepo = PurchaseOrderRepo?? throw new ArgumentNullException(nameof(PurchaseOrderRepo));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         }
@@ -47,7 +50,39 @@ namespace PipeVolt_BLL.Services
                 throw;
             }
         }
-        public async Task<List<ProductDto>> GetInventoriesByWarehouseCodeAsync(string warehouseCode)
+        public async Task<bool> ReceiveFromPurchaseOrderAsync(string warehouseCode, int purchaseOrderId)
+        {
+            // 1. Tìm warehouse
+            var warehouseQuery = await _warehouseRepo.QueryBy(w => w.WarehouseCode == warehouseCode);
+            var warehouse = await warehouseQuery.FirstOrDefaultAsync();
+            if (warehouse == null)
+                throw new KeyNotFoundException("Warehouse not found.");
+
+            // 2. Lấy PurchaseOrder và các chi tiết
+            var poQuery = await _PurchaseOrderRepo.QueryBy(x => x.PurchaseOrderId == purchaseOrderId);
+            var po = await poQuery
+                .Include(x => x.PurchaseOrderDetails)
+                .FirstOrDefaultAsync();
+
+            if (po == null)
+                throw new KeyNotFoundException("Purchase order not found.");
+
+            // 3. Thêm vào Inventory từng sản phẩm
+            foreach (var detail in po.PurchaseOrderDetails)
+            {
+                var inventory = new Inventory
+                {
+                    WarehouseId = warehouse.WarehouseId,
+                    ProductId = detail.ProductId,
+                    PurchaseOrderId = po.PurchaseOrderId,
+                    Quantity = detail.Quantity ?? 0,
+                    UpdatedAt = DateTime.Now
+                };
+                await _repo.Create(inventory);
+            }
+            return true;
+        }
+        public async Task<List<InventoryProductDto>> GetInventoriesByWarehouseCodeAsync(string warehouseCode)
         {
             if (string.IsNullOrWhiteSpace(warehouseCode))
             {
@@ -71,23 +106,28 @@ namespace PipeVolt_BLL.Services
 
                 // 2. Tìm Inventory theo WarehouseId và lấy Product
                 var inventoryQuery = await _repo.QueryBy(i => i.WarehouseId == warehouse.WarehouseId);
-                var products = await inventoryQuery
-                    .Include(i => i.Product)
-                        .ThenInclude(p => p.Category)
-                    .Include(i => i.Product)
-                        .ThenInclude(p => p.Brand)
-                    .Select(i => i.Product)
-                    .Distinct()
-                    .ToListAsync();
+                var inventoryList = await inventoryQuery
+    .Include(i => i.Product)
+        .ThenInclude(p => p.Category)
+    .Include(i => i.Product)
+        .ThenInclude(p => p.Brand)
+    .ToListAsync();
 
-                if (!products.Any())
-                {
-                    _logger.LogWarning($"Không tìm thấy sản phẩm tồn kho nào trong kho {warehouseCode}");
-                    throw new KeyNotFoundException($"Không có sản phẩm nào trong tồn kho của kho {warehouseCode}.");
-                }
+
+
+
+
 
                 // 3. Map sang ProductDto
-                var result = _mapper.Map<List<ProductDto>>(products);
+
+                var result = inventoryList
+     .GroupBy(i => i.ProductId)
+     .Select(g => new InventoryProductDto
+     {
+         Product = _mapper.Map<ProductDto>(g.First().Product),
+         Quantity = g.Sum(x => x.Quantity)
+     })
+     .ToList();
                 _logger.LogInformation($"Đã lấy {result.Count} sản phẩm trong tồn kho của kho {warehouseCode}");
 
                 return result;
