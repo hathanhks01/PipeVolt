@@ -12,8 +12,8 @@ using PipeVolt_DAL.Models;
 namespace PipeVolt_DAL.Migrations
 {
     [DbContext(typeof(PipeVoltDbContext))]
-    [Migration("20250528085752_addImgForcate")]
-    partial class addImgForcate
+    [Migration("20250605092415_INIT")]
+    partial class INIT
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -251,6 +251,190 @@ namespace PipeVolt_DAL.Migrations
                     b.ToTable("INVENTORY");
                 });
 
+            modelBuilder.Entity("PipeVolt_DAL.Models.Invoice", b =>
+                {
+                    b.Property<int>("InvoiceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("invoice_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("InvoiceId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CustomerAddress")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("customer_address");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("int")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("CustomerName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
+                        .HasColumnName("customer_name");
+
+                    b.Property<string>("CustomerPhone")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("customer_phone");
+
+                    b.Property<string>("CustomerTaxCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("customer_tax_code");
+
+                    b.Property<double?>("DiscountAmount")
+                        .HasColumnType("float")
+                        .HasColumnName("discount_amount");
+
+                    b.Property<DateTime?>("DueDate")
+                        .HasColumnType("datetime")
+                        .HasColumnName("due_date");
+
+                    b.Property<int?>("EmployeeId")
+                        .HasColumnType("int")
+                        .HasColumnName("employee_id");
+
+                    b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("invoice_number");
+
+                    b.Property<string>("InvoiceTemplate")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("invoice_template");
+
+                    b.Property<DateTime>("IssueDate")
+                        .HasColumnType("datetime")
+                        .HasColumnName("issue_date");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("notes");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("PaymentStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("payment_status");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("status");
+
+                    b.Property<double>("SubTotal")
+                        .HasColumnType("float")
+                        .HasColumnName("subtotal");
+
+                    b.Property<double>("TotalAmount")
+                        .HasColumnType("float")
+                        .HasColumnName("total_amount");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("(getdate())");
+
+                    b.Property<double>("VatAmount")
+                        .HasColumnType("float")
+                        .HasColumnName("vat_amount");
+
+                    b.Property<double>("VatRate")
+                        .HasColumnType("float")
+                        .HasColumnName("vat_rate");
+
+                    b.HasKey("InvoiceId")
+                        .HasName("PK__INVOICE__ID");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex(new[] { "InvoiceNumber" }, "UQ__INVOICE__number")
+                        .IsUnique();
+
+                    b.ToTable("INVOICE");
+                });
+
+            modelBuilder.Entity("PipeVolt_DAL.Models.InvoiceDetail", b =>
+                {
+                    b.Property<int>("InvoiceDetailId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("invoice_detail_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("InvoiceDetailId"));
+
+                    b.Property<double?>("Discount")
+                        .HasColumnType("float")
+                        .HasColumnName("discount");
+
+                    b.Property<int>("InvoiceId")
+                        .HasColumnType("int")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<double?>("LineTotal")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("float")
+                        .HasColumnName("line_total")
+                        .HasComputedColumnSql("(([quantity]*[unit_price])-isnull([discount],0))", false);
+
+                    b.Property<string>("ProductCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("product_code");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("product_name");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int")
+                        .HasColumnName("quantity");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("unit");
+
+                    b.Property<double>("UnitPrice")
+                        .HasColumnType("float")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("InvoiceDetailId")
+                        .HasName("PK__INVOICE_DETAIL__ID");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("INVOICE_DETAIL");
+                });
+
             modelBuilder.Entity("PipeVolt_DAL.Models.OrderDetail", b =>
                 {
                     b.Property<int>("OrderDetailId")
@@ -294,6 +478,84 @@ namespace PipeVolt_DAL.Migrations
                     b.HasIndex("ProductId");
 
                     b.ToTable("ORDER_DETAIL");
+                });
+
+            modelBuilder.Entity("PipeVolt_DAL.Models.PaymentMethod", b =>
+                {
+                    b.Property<int>("PaymentMethodId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("payment_method_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PaymentMethodId"));
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsOnline")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_online");
+
+                    b.Property<string>("MethodName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("method_name");
+
+                    b.HasKey("PaymentMethodId")
+                        .HasName("PK__PAYMENT_METHOD__E8C9B7A3");
+
+                    b.ToTable("PAYMENT_METHOD");
+                });
+
+            modelBuilder.Entity("PipeVolt_DAL.Models.PaymentTransaction", b =>
+                {
+                    b.Property<int>("TransactionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("transaction_id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TransactionId"));
+
+                    b.Property<double>("Amount")
+                        .HasColumnType("float")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("GatewayResponse")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("gateway_response");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int")
+                        .HasColumnName("order_id");
+
+                    b.Property<int>("PaymentMethodId")
+                        .HasColumnType("int")
+                        .HasColumnName("payment_method_id");
+
+                    b.Property<int?>("Status")
+                        .HasColumnType("int")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TransactionCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("transaction_code");
+
+                    b.Property<DateTime>("TransactionDate")
+                        .HasColumnType("datetime")
+                        .HasColumnName("transaction_date");
+
+                    b.HasKey("TransactionId")
+                        .HasName("PK__PAYMENT_TRANSACTION__A1C3D8F2");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("PaymentMethodId");
+
+                    b.ToTable("PAYMENT_TRANSACTION");
                 });
 
             modelBuilder.Entity("PipeVolt_DAL.Models.Product", b =>
@@ -515,14 +777,12 @@ namespace PipeVolt_DAL.Migrations
                         .HasColumnName("order_date")
                         .HasDefaultValueSql("(getdate())");
 
-                    b.Property<string>("PaymentMethod")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasColumnName("payment_method");
+                    b.Property<int?>("PaymentMethodId")
+                        .HasColumnType("int")
+                        .HasColumnName("payment_method_id");
 
-                    b.Property<string>("Status")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
+                    b.Property<int?>("Status")
+                        .HasColumnType("int")
                         .HasColumnName("status");
 
                     b.Property<double?>("TaxAmount")
@@ -539,6 +799,8 @@ namespace PipeVolt_DAL.Migrations
                     b.HasIndex("CustomerId");
 
                     b.HasIndex("EmployeeId");
+
+                    b.HasIndex("PaymentMethodId");
 
                     b.HasIndex(new[] { "OrderCode" }, "UQ__SALES_OR__99D12D3F11C3C006")
                         .IsUnique()
@@ -686,6 +948,10 @@ namespace PipeVolt_DAL.Migrations
                         .HasColumnType("nvarchar(255)")
                         .HasColumnName("address");
 
+                    b.Property<string>("WarehouseCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("WarehouseName")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)")
@@ -802,6 +1068,48 @@ namespace PipeVolt_DAL.Migrations
                     b.Navigation("Warehouse");
                 });
 
+            modelBuilder.Entity("PipeVolt_DAL.Models.Invoice", b =>
+                {
+                    b.HasOne("PipeVolt_DAL.Models.Customer", "Customer")
+                        .WithMany("Invoices")
+                        .HasForeignKey("CustomerId")
+                        .IsRequired();
+
+                    b.HasOne("PipeVolt_DAL.Models.Employee", "Employee")
+                        .WithMany("Invoices")
+                        .HasForeignKey("EmployeeId");
+
+                    b.HasOne("PipeVolt_DAL.Models.SalesOrder", "Order")
+                        .WithMany("Invoices")
+                        .HasForeignKey("OrderId")
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("PipeVolt_DAL.Models.InvoiceDetail", b =>
+                {
+                    b.HasOne("PipeVolt_DAL.Models.Invoice", "Invoice")
+                        .WithMany("InvoiceDetails")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PipeVolt_DAL.Models.Product", "Product")
+                        .WithMany("InvoiceDetails")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Invoice");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("PipeVolt_DAL.Models.OrderDetail", b =>
                 {
                     b.HasOne("PipeVolt_DAL.Models.SalesOrder", "Order")
@@ -819,6 +1127,25 @@ namespace PipeVolt_DAL.Migrations
                     b.Navigation("Order");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("PipeVolt_DAL.Models.PaymentTransaction", b =>
+                {
+                    b.HasOne("PipeVolt_DAL.Models.SalesOrder", "Order")
+                        .WithMany("PaymentTransactions")
+                        .HasForeignKey("OrderId")
+                        .IsRequired()
+                        .HasConstraintName("FK__PAYMENT_TRANS__order__7A672E12");
+
+                    b.HasOne("PipeVolt_DAL.Models.PaymentMethod", "PaymentMethod")
+                        .WithMany("PaymentTransactions")
+                        .HasForeignKey("PaymentMethodId")
+                        .IsRequired()
+                        .HasConstraintName("FK__PAYMENT_TRANS__method__7B573F34");
+
+                    b.Navigation("Order");
+
+                    b.Navigation("PaymentMethod");
                 });
 
             modelBuilder.Entity("PipeVolt_DAL.Models.Product", b =>
@@ -886,9 +1213,15 @@ namespace PipeVolt_DAL.Migrations
                         .HasForeignKey("EmployeeId")
                         .HasConstraintName("FK__SALES_ORD__emplo__656C112C");
 
+                    b.HasOne("PipeVolt_DAL.Models.PaymentMethod", "PaymentMethod")
+                        .WithMany("SalesOrders")
+                        .HasForeignKey("PaymentMethodId");
+
                     b.Navigation("Customer");
 
                     b.Navigation("Employee");
+
+                    b.Navigation("PaymentMethod");
                 });
 
             modelBuilder.Entity("PipeVolt_DAL.Models.Supply", b =>
@@ -960,6 +1293,8 @@ namespace PipeVolt_DAL.Migrations
                 {
                     b.Navigation("Carts");
 
+                    b.Navigation("Invoices");
+
                     b.Navigation("SalesOrders");
 
                     b.Navigation("UserAccounts");
@@ -969,6 +1304,8 @@ namespace PipeVolt_DAL.Migrations
 
             modelBuilder.Entity("PipeVolt_DAL.Models.Employee", b =>
                 {
+                    b.Navigation("Invoices");
+
                     b.Navigation("PurchaseOrders");
 
                     b.Navigation("SalesOrders");
@@ -976,11 +1313,25 @@ namespace PipeVolt_DAL.Migrations
                     b.Navigation("UserAccounts");
                 });
 
+            modelBuilder.Entity("PipeVolt_DAL.Models.Invoice", b =>
+                {
+                    b.Navigation("InvoiceDetails");
+                });
+
+            modelBuilder.Entity("PipeVolt_DAL.Models.PaymentMethod", b =>
+                {
+                    b.Navigation("PaymentTransactions");
+
+                    b.Navigation("SalesOrders");
+                });
+
             modelBuilder.Entity("PipeVolt_DAL.Models.Product", b =>
                 {
                     b.Navigation("CartItems");
 
                     b.Navigation("Inventories");
+
+                    b.Navigation("InvoiceDetails");
 
                     b.Navigation("OrderDetails");
 
@@ -1005,7 +1356,11 @@ namespace PipeVolt_DAL.Migrations
 
             modelBuilder.Entity("PipeVolt_DAL.Models.SalesOrder", b =>
                 {
+                    b.Navigation("Invoices");
+
                     b.Navigation("OrderDetails");
+
+                    b.Navigation("PaymentTransactions");
                 });
 
             modelBuilder.Entity("PipeVolt_DAL.Models.Supplier", b =>

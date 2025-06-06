@@ -30,8 +30,7 @@ public partial class Warranty
     public DateOnly? EndDate { get; set; }
 
     [Column("status")]
-    [StringLength(50)]
-    public string? Status { get; set; }
+    public int? Status { get; set; }
 
     [Column("notes")]
     public string? Notes { get; set; }

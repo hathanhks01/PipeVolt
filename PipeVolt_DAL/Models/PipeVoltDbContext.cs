@@ -49,6 +49,9 @@ public partial class PipeVoltDbContext : DbContext
     public virtual DbSet<PaymentTransaction> PaymentTransactions { get; set; }
     public virtual DbSet<Invoice> Invoices { get; set; }
     public virtual DbSet<InvoiceDetail> InvoiceDetails { get; set; }
+    public virtual DbSet<ChatRoom> ChatRooms { get; set; }
+    public virtual DbSet<ChatMessage> ChatMessages { get; set; }
+    public virtual DbSet<ChatParticipant> ChatParticipants { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
@@ -253,6 +256,59 @@ public partial class PipeVoltDbContext : DbContext
             entity.Property(e => e.LineTotal)
                 .HasComputedColumnSql("(([quantity]*[unit_price])-isnull([discount],0))", false);
         });
+        modelBuilder.Entity<ChatRoom>(entity =>
+        {
+            entity.HasKey(e => e.ChatRoomId).HasName("PK__CHAT_ROOM__ID");
+            entity.Property(e => e.ChatRoomId).ValueGeneratedOnAdd();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getdate())");
+
+            entity.HasOne(d => d.Customer)
+                .WithMany(p => p.ChatRooms)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK__CHAT_ROOM__customer");
+
+            entity.HasOne(d => d.Employee)
+                .WithMany(p => p.ChatRooms)
+                .HasConstraintName("FK__CHAT_ROOM__employee");
+        });
+
+        // Cấu hình cho ChatMessage
+        modelBuilder.Entity<ChatMessage>(entity =>
+        {
+            entity.HasKey(e => e.MessageId).HasName("PK__CHAT_MESSAGE__ID");
+            entity.Property(e => e.MessageId).ValueGeneratedOnAdd();
+            entity.Property(e => e.SentAt).HasDefaultValueSql("(getdate())");
+
+            entity.HasOne(d => d.ChatRoom)
+                .WithMany(p => p.ChatMessages)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK__CHAT_MESSAGE__room");
+
+            // Index cho performance
+            entity.HasIndex(e => e.ChatRoomId).HasDatabaseName("IX_CHAT_MESSAGE_ROOM_ID");
+            entity.HasIndex(e => e.SentAt).HasDatabaseName("IX_CHAT_MESSAGE_SENT_AT");
+            entity.HasIndex(e => e.IsRead).HasDatabaseName("IX_CHAT_MESSAGE_IS_READ");
+        });
+
+        // Cấu hình cho ChatParticipant
+        modelBuilder.Entity<ChatParticipant>(entity =>
+        {
+            entity.HasKey(e => e.ParticipantId).HasName("PK__CHAT_PARTICIPANT__ID");
+            entity.Property(e => e.ParticipantId).ValueGeneratedOnAdd();
+            entity.Property(e => e.JoinedAt).HasDefaultValueSql("(getdate())");
+
+            entity.HasOne(d => d.ChatRoom)
+                .WithMany(p => p.ChatParticipants)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK__CHAT_PARTICIPANT__room");
+
+            // Unique constraint để tránh duplicate participant
+            entity.HasIndex(e => new { e.ChatRoomId, e.UserId, e.UserType })
+                .HasDatabaseName("UQ__CHAT_PARTICIPANT__ROOM_USER")
+                .IsUnique();
+        });
+
 
         OnModelCreatingPartial(modelBuilder);
     }

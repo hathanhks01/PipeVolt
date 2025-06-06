@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore; // Added for Include and FirstOrDefaultAsync
 using PipeVolt_Api.Common.Repository;
 using PipeVolt_BLL.IServices;
+using PipeVolt_DAL.Common;
 using PipeVolt_DAL.IRepositories;
 using PipeVolt_DAL.Models;
 using System;
@@ -153,8 +154,8 @@ namespace PipeVolt_BLL.Services
                         VatRate = 0.1,
                         VatAmount = salesOrder.TaxAmount ?? 0,
                         TotalAmount = salesOrder.NetAmount ?? 0,
-                        Status = "Draft",
-                        PaymentStatus = "Unpaid"
+                        Status = (int)DataType.InvoiceStatus.Draft,
+                        PaymentStatus =(int)DataType.PaymentStatus.UnPaid
                     };
 
                     var createdInvoice = await _invoiceRepo.Create(invoice);
@@ -344,8 +345,8 @@ namespace PipeVolt_BLL.Services
                         VatRate = 0.1,
                         VatAmount = salesOrder.TaxAmount ?? 0,
                         TotalAmount = salesOrder.NetAmount ?? 0,
-                        Status = "Completed",
-                        PaymentStatus = "Paid"
+                        Status =(int)DataType.InvoiceStatus.Paid,
+                        PaymentStatus = (int)DataType.PaymentStatus.Paid
                     };
 
                     var createdInvoice = await _invoiceRepo.Create(invoice);

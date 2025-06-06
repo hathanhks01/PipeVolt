@@ -47,4 +47,6 @@ public partial class Employee
     public virtual ICollection<UserAccount> UserAccounts { get; set; } = new List<UserAccount>();
     [InverseProperty("Employee")]
     public virtual ICollection<Invoice>? Invoices { get; set; } = new List<Invoice>();
+    [InverseProperty("Employee")]
+    public virtual ICollection<ChatRoom> ChatRooms { get; set; } = new List<ChatRoom>();
 }

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace PipeVolt_DAL.Migrations
 {
     /// <inheritdoc />
-    public partial class init : Migration
+    public partial class INIT : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -61,13 +61,29 @@ namespace PipeVolt_DAL.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PAYMENT_METHOD",
+                columns: table => new
+                {
+                    payment_method_id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    method_name = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    description = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
+                    is_online = table.Column<bool>(type: "bit", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK__PAYMENT_METHOD__E8C9B7A3", x => x.payment_method_id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "PRODUCT_CATEGORY",
                 columns: table => new
                 {
                     category_id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     category_name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
-                    description = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    description = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    image_url = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -97,6 +113,7 @@ namespace PipeVolt_DAL.Migrations
                 {
                     warehouse_id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
+                    WarehouseCode = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     warehouse_name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
                     address = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true)
                 },
@@ -126,38 +143,6 @@ namespace PipeVolt_DAL.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "SALES_ORDER",
-                columns: table => new
-                {
-                    order_id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    order_code = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                    customer_id = table.Column<int>(type: "int", nullable: true),
-                    employee_id = table.Column<int>(type: "int", nullable: true),
-                    order_date = table.Column<DateTime>(type: "datetime", nullable: true, defaultValueSql: "(getdate())"),
-                    total_amount = table.Column<double>(type: "float", nullable: true),
-                    discount_amount = table.Column<double>(type: "float", nullable: true),
-                    tax_amount = table.Column<double>(type: "float", nullable: true),
-                    net_amount = table.Column<double>(type: "float", nullable: true, computedColumnSql: "(([total_amount]-[discount_amount])+[tax_amount])", stored: false),
-                    status = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                    payment_method = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK__SALES_OR__4659622993289FF9", x => x.order_id);
-                    table.ForeignKey(
-                        name: "FK__SALES_ORD__custo__6477ECF3",
-                        column: x => x.customer_id,
-                        principalTable: "CUSTOMER",
-                        principalColumn: "customer_id");
-                    table.ForeignKey(
-                        name: "FK__SALES_ORD__emplo__656C112C",
-                        column: x => x.employee_id,
-                        principalTable: "EMPLOYEE",
-                        principalColumn: "employee_id");
-                });
-
-            migrationBuilder.CreateTable(
                 name: "USER_ACCOUNT",
                 columns: table => new
                 {
@@ -180,6 +165,43 @@ namespace PipeVolt_DAL.Migrations
                         principalColumn: "customer_id");
                     table.ForeignKey(
                         name: "FK__USER_ACCO__emplo__5EBF139D",
+                        column: x => x.employee_id,
+                        principalTable: "EMPLOYEE",
+                        principalColumn: "employee_id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SALES_ORDER",
+                columns: table => new
+                {
+                    order_id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    order_code = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    customer_id = table.Column<int>(type: "int", nullable: true),
+                    employee_id = table.Column<int>(type: "int", nullable: true),
+                    order_date = table.Column<DateTime>(type: "datetime", nullable: true, defaultValueSql: "(getdate())"),
+                    total_amount = table.Column<double>(type: "float", nullable: true),
+                    discount_amount = table.Column<double>(type: "float", nullable: true),
+                    tax_amount = table.Column<double>(type: "float", nullable: true),
+                    net_amount = table.Column<double>(type: "float", nullable: true, computedColumnSql: "(([total_amount]-[discount_amount])+[tax_amount])", stored: false),
+                    status = table.Column<int>(type: "int", nullable: true),
+                    payment_method_id = table.Column<int>(type: "int", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK__SALES_OR__4659622993289FF9", x => x.order_id);
+                    table.ForeignKey(
+                        name: "FK_SALES_ORDER_PAYMENT_METHOD_payment_method_id",
+                        column: x => x.payment_method_id,
+                        principalTable: "PAYMENT_METHOD",
+                        principalColumn: "payment_method_id");
+                    table.ForeignKey(
+                        name: "FK__SALES_ORD__custo__6477ECF3",
+                        column: x => x.customer_id,
+                        principalTable: "CUSTOMER",
+                        principalColumn: "customer_id");
+                    table.ForeignKey(
+                        name: "FK__SALES_ORD__emplo__656C112C",
                         column: x => x.employee_id,
                         principalTable: "EMPLOYEE",
                         principalColumn: "employee_id");
@@ -241,6 +263,83 @@ namespace PipeVolt_DAL.Migrations
                         column: x => x.supplier_id,
                         principalTable: "SUPPLIER",
                         principalColumn: "supplier_id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "INVOICE",
+                columns: table => new
+                {
+                    invoice_id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    invoice_number = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    invoice_template = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    order_id = table.Column<int>(type: "int", nullable: false),
+                    customer_id = table.Column<int>(type: "int", nullable: false),
+                    employee_id = table.Column<int>(type: "int", nullable: true),
+                    issue_date = table.Column<DateTime>(type: "datetime", nullable: false),
+                    due_date = table.Column<DateTime>(type: "datetime", nullable: true),
+                    subtotal = table.Column<double>(type: "float", nullable: false),
+                    vat_rate = table.Column<double>(type: "float", nullable: false),
+                    vat_amount = table.Column<double>(type: "float", nullable: false),
+                    total_amount = table.Column<double>(type: "float", nullable: false),
+                    discount_amount = table.Column<double>(type: "float", nullable: true),
+                    customer_name = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
+                    customer_address = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
+                    customer_tax_code = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    customer_phone = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    status = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    payment_status = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    notes = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    created_at = table.Column<DateTime>(type: "datetime", nullable: false),
+                    updated_at = table.Column<DateTime>(type: "datetime", nullable: false, defaultValueSql: "(getdate())")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK__INVOICE__ID", x => x.invoice_id);
+                    table.ForeignKey(
+                        name: "FK_INVOICE_CUSTOMER_customer_id",
+                        column: x => x.customer_id,
+                        principalTable: "CUSTOMER",
+                        principalColumn: "customer_id");
+                    table.ForeignKey(
+                        name: "FK_INVOICE_EMPLOYEE_employee_id",
+                        column: x => x.employee_id,
+                        principalTable: "EMPLOYEE",
+                        principalColumn: "employee_id");
+                    table.ForeignKey(
+                        name: "FK_INVOICE_SALES_ORDER_order_id",
+                        column: x => x.order_id,
+                        principalTable: "SALES_ORDER",
+                        principalColumn: "order_id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PAYMENT_TRANSACTION",
+                columns: table => new
+                {
+                    transaction_id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    order_id = table.Column<int>(type: "int", nullable: false),
+                    payment_method_id = table.Column<int>(type: "int", nullable: false),
+                    transaction_code = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    amount = table.Column<double>(type: "float", nullable: false),
+                    transaction_date = table.Column<DateTime>(type: "datetime", nullable: false),
+                    status = table.Column<int>(type: "int", nullable: true),
+                    gateway_response = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK__PAYMENT_TRANSACTION__A1C3D8F2", x => x.transaction_id);
+                    table.ForeignKey(
+                        name: "FK__PAYMENT_TRANS__method__7B573F34",
+                        column: x => x.payment_method_id,
+                        principalTable: "PAYMENT_METHOD",
+                        principalColumn: "payment_method_id");
+                    table.ForeignKey(
+                        name: "FK__PAYMENT_TRANS__order__7A672E12",
+                        column: x => x.order_id,
+                        principalTable: "SALES_ORDER",
+                        principalColumn: "order_id");
                 });
 
             migrationBuilder.CreateTable(
@@ -414,6 +513,39 @@ namespace PipeVolt_DAL.Migrations
                         principalColumn: "purchase_order_id");
                 });
 
+            migrationBuilder.CreateTable(
+                name: "INVOICE_DETAIL",
+                columns: table => new
+                {
+                    invoice_detail_id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    invoice_id = table.Column<int>(type: "int", nullable: false),
+                    product_id = table.Column<int>(type: "int", nullable: false),
+                    product_name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    product_code = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    unit = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    quantity = table.Column<int>(type: "int", nullable: false),
+                    unit_price = table.Column<double>(type: "float", nullable: false),
+                    discount = table.Column<double>(type: "float", nullable: true),
+                    line_total = table.Column<double>(type: "float", nullable: true, computedColumnSql: "(([quantity]*[unit_price])-isnull([discount],0))", stored: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK__INVOICE_DETAIL__ID", x => x.invoice_detail_id);
+                    table.ForeignKey(
+                        name: "FK_INVOICE_DETAIL_INVOICE_invoice_id",
+                        column: x => x.invoice_id,
+                        principalTable: "INVOICE",
+                        principalColumn: "invoice_id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_INVOICE_DETAIL_PRODUCT_product_id",
+                        column: x => x.product_id,
+                        principalTable: "PRODUCT",
+                        principalColumn: "product_id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "UQ__BRAND__0C0C3B583015C4E1",
                 table: "BRAND",
@@ -465,6 +597,37 @@ namespace PipeVolt_DAL.Migrations
                 column: "warehouse_id");
 
             migrationBuilder.CreateIndex(
+                name: "IX_INVOICE_customer_id",
+                table: "INVOICE",
+                column: "customer_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_INVOICE_employee_id",
+                table: "INVOICE",
+                column: "employee_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_INVOICE_order_id",
+                table: "INVOICE",
+                column: "order_id");
+
+            migrationBuilder.CreateIndex(
+                name: "UQ__INVOICE__number",
+                table: "INVOICE",
+                column: "invoice_number",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_INVOICE_DETAIL_invoice_id",
+                table: "INVOICE_DETAIL",
+                column: "invoice_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_INVOICE_DETAIL_product_id",
+                table: "INVOICE_DETAIL",
+                column: "product_id");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ORDER_DETAIL_order_id",
                 table: "ORDER_DETAIL",
                 column: "order_id");
@@ -473,6 +636,16 @@ namespace PipeVolt_DAL.Migrations
                 name: "IX_ORDER_DETAIL_product_id",
                 table: "ORDER_DETAIL",
                 column: "product_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PAYMENT_TRANSACTION_order_id",
+                table: "PAYMENT_TRANSACTION",
+                column: "order_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PAYMENT_TRANSACTION_payment_method_id",
+                table: "PAYMENT_TRANSACTION",
+                column: "payment_method_id");
 
             migrationBuilder.CreateIndex(
                 name: "IX_PRODUCT_brand_id",
@@ -528,6 +701,11 @@ namespace PipeVolt_DAL.Migrations
                 column: "employee_id");
 
             migrationBuilder.CreateIndex(
+                name: "IX_SALES_ORDER_payment_method_id",
+                table: "SALES_ORDER",
+                column: "payment_method_id");
+
+            migrationBuilder.CreateIndex(
                 name: "UQ__SALES_OR__99D12D3F11C3C006",
                 table: "SALES_ORDER",
                 column: "order_code",
@@ -581,7 +759,13 @@ namespace PipeVolt_DAL.Migrations
                 name: "INVENTORY");
 
             migrationBuilder.DropTable(
+                name: "INVOICE_DETAIL");
+
+            migrationBuilder.DropTable(
                 name: "ORDER_DETAIL");
+
+            migrationBuilder.DropTable(
+                name: "PAYMENT_TRANSACTION");
 
             migrationBuilder.DropTable(
                 name: "PURCHASE_ORDER_DETAIL");
@@ -602,7 +786,7 @@ namespace PipeVolt_DAL.Migrations
                 name: "WAREHOUSE");
 
             migrationBuilder.DropTable(
-                name: "SALES_ORDER");
+                name: "INVOICE");
 
             migrationBuilder.DropTable(
                 name: "PURCHASE_ORDER");
@@ -611,10 +795,7 @@ namespace PipeVolt_DAL.Migrations
                 name: "PRODUCT");
 
             migrationBuilder.DropTable(
-                name: "CUSTOMER");
-
-            migrationBuilder.DropTable(
-                name: "EMPLOYEE");
+                name: "SALES_ORDER");
 
             migrationBuilder.DropTable(
                 name: "SUPPLIER");
@@ -624,6 +805,15 @@ namespace PipeVolt_DAL.Migrations
 
             migrationBuilder.DropTable(
                 name: "PRODUCT_CATEGORY");
+
+            migrationBuilder.DropTable(
+                name: "PAYMENT_METHOD");
+
+            migrationBuilder.DropTable(
+                name: "CUSTOMER");
+
+            migrationBuilder.DropTable(
+                name: "EMPLOYEE");
         }
     }
 }

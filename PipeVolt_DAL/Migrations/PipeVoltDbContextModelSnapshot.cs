@@ -532,9 +532,8 @@ namespace PipeVolt_DAL.Migrations
                         .HasColumnType("int")
                         .HasColumnName("payment_method_id");
 
-                    b.Property<string>("Status")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
+                    b.Property<int?>("Status")
+                        .HasColumnType("int")
                         .HasColumnName("status");
 
                     b.Property<string>("TransactionCode")
@@ -779,9 +778,8 @@ namespace PipeVolt_DAL.Migrations
                         .HasColumnType("int")
                         .HasColumnName("payment_method_id");
 
-                    b.Property<string>("Status")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
+                    b.Property<int?>("Status")
+                        .HasColumnType("int")
                         .HasColumnName("status");
 
                     b.Property<double?>("TaxAmount")
@@ -946,6 +944,10 @@ namespace PipeVolt_DAL.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)")
                         .HasColumnName("address");
+
+                    b.Property<string>("WarehouseCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("WarehouseName")
                         .HasMaxLength(100)

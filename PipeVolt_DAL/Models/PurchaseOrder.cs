@@ -31,8 +31,7 @@ public partial class PurchaseOrder
     public double? TotalAmount { get; set; }
 
     [Column("status")]
-    [StringLength(50)]
-    public string? Status { get; set; }
+    public int? Status { get; set; }
 
     [ForeignKey("EmployeeId")]
     [InverseProperty("PurchaseOrders")]

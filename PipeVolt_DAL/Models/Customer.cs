@@ -49,4 +49,6 @@ public partial class Customer
     public virtual ICollection<Warranty> Warranties { get; set; } = new List<Warranty>();
     [InverseProperty("Customer")]
     public virtual ICollection<Invoice>? Invoices { get; set; } = new List<Invoice>();
+    [InverseProperty("Customer")]
+    public virtual ICollection<ChatRoom> ChatRooms { get; set; } = new List<ChatRoom>();
 }

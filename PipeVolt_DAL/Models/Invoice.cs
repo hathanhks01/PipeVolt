@@ -76,11 +76,11 @@ namespace PipeVolt_DAL.Models
         // Trạng thái hóa đơn
         [Column("status")]
         [StringLength(50)]
-        public string Status { get; set; } = "Draft"; // Draft, Issued, Paid, Cancelled
+        public int Status { get; set; } = 0; // Draft, Issued, Paid, Cancelled
 
         [Column("payment_status")]
         [StringLength(50)]
-        public string PaymentStatus { get; set; } = "Unpaid"; // Paid, Unpaid, Partial
+        public int PaymentStatus { get; set; } = 1; // Paid, Unpaid, Partial
 
         // Ghi chú
         [Column("notes")]
