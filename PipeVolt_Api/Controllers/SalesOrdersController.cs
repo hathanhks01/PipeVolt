@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.DTOS;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace PipeVolt_Api.Controllers
 {
@@ -8,7 +10,7 @@ namespace PipeVolt_Api.Controllers
     [Route("api/[controller]")]
     public class SalesOrdersController : ControllerBase
     {
-        private readonly ISalesOrderService _service;
+        private readonly ISalesOrderService _service;   
         public SalesOrdersController(ISalesOrderService service) => _service = service;
 
         [HttpGet]
@@ -43,6 +45,7 @@ namespace PipeVolt_Api.Controllers
             await _service.DeleteSalesOrderAsync(id);
             return NoContent();
         }
+
         [HttpPost("Checkout")]
         public async Task<IActionResult> Checkout([FromBody] CheckoutDto dto)
         {
@@ -52,6 +55,19 @@ namespace PipeVolt_Api.Controllers
             await _service.Checkout(dto);
             return Ok(new { message = "Checkout successful" });
         }
-    }
 
+        /// <summary>
+        /// Lấy danh sách đơn hàng theo userId
+        /// </summary>
+        /// <param name="userId">ID của user</param>
+        /// <returns>Danh sách SalesOrderDto</returns>
+        [HttpGet("by-user/{userId}")]
+        public async Task<ActionResult<List<SalesOrderDto>>> GetSalesOrdersByUserId(int userId)
+        {
+            var orders = await _service.GetSalesOrdersByUserIdAsync(userId);
+            if (orders == null || orders.Count == 0)
+                return NotFound("Không tìm thấy đơn hàng cho user này.");
+            return Ok(orders);
+        }
+    }
 }

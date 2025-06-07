@@ -17,6 +17,7 @@ namespace PipeVolt_BLL.Services
         private readonly IGenericRepository<SalesOrder> _repo;
         private readonly IGenericRepository<OrderDetail> _repoOrderDetail;
         private readonly IGenericRepository<CartItem> _repoCartItem;
+        private readonly IGenericRepository<UserAccount> _userAccountRepo; // thêm dòng này
         private readonly ILoggerService _logger;
         private readonly IMapper _mapper;
 
@@ -24,12 +25,14 @@ namespace PipeVolt_BLL.Services
             IGenericRepository<SalesOrder> repo,
             IGenericRepository<CartItem> repoCartItem,
             IGenericRepository<OrderDetail> repoOrderDetail,
+            IGenericRepository<UserAccount> userAccountRepo, // thêm dòng này
             ILoggerService logger,
             IMapper mapper)
         {
             _repo = repo ?? throw new ArgumentNullException(nameof(repo));
             _repoCartItem = repoCartItem ?? throw new ArgumentNullException(nameof(repoCartItem));
             _repoOrderDetail = repoOrderDetail ?? throw new ArgumentNullException(nameof(repoOrderDetail));
+            _userAccountRepo = userAccountRepo ?? throw new ArgumentNullException(nameof(userAccountRepo)); // thêm dòng này
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
         }
@@ -196,6 +199,27 @@ namespace PipeVolt_BLL.Services
                 }
                 _logger.LogInformation("Deleted cart items after checkout");
             }
+        }
+        public async Task<List<SalesOrderDto>> GetSalesOrdersByUserIdAsync(int userId)
+        {
+            _logger.LogInformation($"Fetching sales orders for userId: {userId}");
+
+            // Lấy UserAccount để tìm CustomerId
+            var userAccounts = await _userAccountRepo.QueryBy(x => x.UserId == userId);
+            var userAccount = userAccounts.FirstOrDefault();
+            if (userAccount == null || userAccount.CustomerId == null)
+            {
+                _logger.LogWarning($"UserAccount with userId {userId} not found or does not have a CustomerId");
+                return new List<SalesOrderDto>();
+            }
+
+            // Lấy các đơn hàng theo CustomerId
+            var salesOrders = await _repo.QueryBy(x => x.CustomerId == userAccount.CustomerId.Value);
+            var salesOrderList = salesOrders.ToList();
+
+            _logger.LogInformation($"Fetched {salesOrderList.Count} sales orders for userId: {userId}");
+
+            return _mapper.Map<List<SalesOrderDto>>(salesOrderList);
         }
     }
 }

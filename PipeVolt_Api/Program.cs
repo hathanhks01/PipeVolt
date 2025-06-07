@@ -52,6 +52,10 @@ builder.Services.AddMemoryCache();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = true; // Cho phép lỗi chi tiết trong SignalR
+});
 // Repositories
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IUserAccountRepository, UserAccountRepository>();
@@ -101,6 +105,7 @@ builder.Services.AddScoped<ICartItemService, CartItemService>();
 builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IUserAccountService, UserAccountService>();
 builder.Services.AddScoped<ICheckoutService,CheckoutService>();
+builder.Services.AddScoped<IChatService, ChatService>();
 // Logger
 builder.Services.AddScoped<ILoggerService, LoggerService>();
 
@@ -112,7 +117,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
+app.MapHub<ChatHub>("/chathub");
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

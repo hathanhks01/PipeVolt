@@ -14,7 +14,7 @@ namespace PipeVolt_DAL.DTOS
         public int? EmployeeId { get; set; }
         public string? EmployeeName { get; set; }
         public string? RoomName { get; set; }
-        public string Status { get; set; } = null!;
+        public int Status { get; set; } 
         public DateTime CreatedAt { get; set; }
         public DateTime? LastMessageAt { get; set; }
         public string? LastMessage { get; set; }
@@ -26,10 +26,10 @@ namespace PipeVolt_DAL.DTOS
         public int MessageId { get; set; }
         public int ChatRoomId { get; set; }
         public int SenderId { get; set; }
-        public string SenderType { get; set; } = null!;
+        public int SenderType { get; set; }
         public string SenderName { get; set; } = null!;
         public string MessageContent { get; set; } = null!;
-        public string MessageType { get; set; } = null!;
+        public int MessageType { get; set; }
         public string? AttachmentUrl { get; set; }
         public bool IsRead { get; set; }
         public DateTime SentAt { get; set; }
@@ -40,9 +40,9 @@ namespace PipeVolt_DAL.DTOS
     {
         public int ChatRoomId { get; set; }
         public int SenderId { get; set; }
-        public string SenderType { get; set; } = null!;
+        public int SenderType { get; set; } 
         public string MessageContent { get; set; } = null!;
-        public string MessageType { get; set; } = "Text";
+        public int MessageType { get; set; } =0;
         public string? AttachmentUrl { get; set; }
     }
 

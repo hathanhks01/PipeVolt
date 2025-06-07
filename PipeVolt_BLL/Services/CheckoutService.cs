@@ -327,7 +327,7 @@ namespace PipeVolt_BLL.Services
 
                     // 8. Cập nhật trạng thái thanh toán thành công
                     paymentTransaction.Status = (int)PaymentTransactionStatus.Suscess;
-                    salesOrder.Status = (int)SaleStatus.Paid;
+                    salesOrder.Status = (int)SaleStatus.refund;
                     await _paymentTransactionRepo.Update(paymentTransaction);
                     // 9. Tạo Invoice
                     var invoice = new Invoice

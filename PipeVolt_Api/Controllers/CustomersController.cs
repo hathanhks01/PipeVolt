@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.DTOS;
+using PipeVolt_DAL.Models;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -151,6 +152,14 @@ namespace PipeVolt_Api.Controllers
             {
                 return StatusCode(500, $"Lỗi khi xóa khách hàng: {ex.Message}");
             }
+        }
+        [HttpGet("by-user/{userId}")]
+        public async Task<ActionResult<CustomerDto>> GetCustomerByUserId(int userId)
+        {
+            var customer = await _customerService.GetCustomerByUserIdAsync(userId);
+            if (customer == null)
+                return NotFound("Customer not found for this userId.");
+            return Ok(customer);
         }
     }
 }

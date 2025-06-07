@@ -10,5 +10,6 @@ namespace PipeVolt_BLL.IServices
         Task<SalesOrderDto> GetSalesOrderByIdAsync(int id);
         Task<SalesOrderDto> UpdateSalesOrderAsync(int id, UpdateSalesOrderDto dto);
         Task Checkout(CheckoutDto checkoutDto);
+        Task<List<SalesOrderDto>> GetSalesOrdersByUserIdAsync(int userId);
     }
 }

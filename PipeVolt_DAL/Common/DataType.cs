@@ -23,9 +23,11 @@ namespace PipeVolt_DAL.Common
         public enum SaleStatus
         {
             Pending = 0,
-            Completed = 1,
-            Cancelled = 2,
-            Paid=3
+            processing=1,
+            shipping=2,
+            Completed = 3,
+            Cancelled = 4,
+            refund = 5
         }
         public enum WarrantyStatus
         {

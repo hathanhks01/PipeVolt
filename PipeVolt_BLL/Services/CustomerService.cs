@@ -15,16 +15,19 @@ namespace PipeVolt_BLL.Services
     {
         private readonly IGenericRepository<Customer> _repo;
         private readonly ICustomerRepository _customerRepo;
+        private readonly IGenericRepository<UserAccount> _userAccountRepo;
         private readonly ILoggerService _loggerService;
         private readonly IMapper _mapper;
 
         public CustomerService(
             IGenericRepository<Customer> repo,
-             ICustomerRepository customerRepo,
+            ICustomerRepository customerRepo,
+            IGenericRepository<UserAccount> userAccountRepo,
             ILoggerService loggerService,
             IMapper mapper)
         {
             _repo = repo ?? throw new ArgumentNullException(nameof(repo));
+            _userAccountRepo = userAccountRepo;
             _customerRepo = customerRepo ?? throw new ArgumentNullException(nameof(customerRepo));
             _loggerService = loggerService ?? throw new ArgumentNullException(nameof(loggerService));
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
@@ -156,6 +159,34 @@ namespace PipeVolt_BLL.Services
                 _loggerService.LogError($"Error deleting customer with ID {customerId}", ex);
                 throw;
             }
+        }
+        public async Task<CustomerDto?> GetCustomerByUserIdAsync(int userId)
+        {
+            _loggerService.LogInformation($"Fetching customer by userId: {userId}");
+
+            var userAccountList = await _userAccountRepo.QueryBy(x => x.UserId == userId);
+            var userAccount = userAccountList.FirstOrDefault();
+            if (userAccount == null)
+            {
+                _loggerService.LogWarning($"UserAccount with userId {userId} not found");
+                return null;
+            }
+            if (userAccount.CustomerId == null)
+            {
+                _loggerService.LogWarning($"UserAccount with userId {userId} does not have a CustomerId");
+                return null;
+            }
+
+            var customerList = await _repo.QueryBy(x => x.CustomerId == userAccount.CustomerId.Value);
+            var customer = customerList.FirstOrDefault();
+            if (customer == null)
+            {
+                _loggerService.LogWarning($"Customer with ID {userAccount.CustomerId.Value} not found for userId {userId}");
+                return null;
+            }
+
+            _loggerService.LogInformation($"Fetched customer with ID {customer.CustomerId} for userId {userId}");
+            return _mapper.Map<CustomerDto>(customer);
         }
     }
 }

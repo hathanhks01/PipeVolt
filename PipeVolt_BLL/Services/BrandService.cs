@@ -48,7 +48,7 @@ namespace PipeVolt_BLL.Services
                 var entity = await Task.Run(() => brand.FirstOrDefault());
                 if (entity == null)
                     throw new KeyNotFoundException("brand not found.");
-                return _mapper.Map<BrandDto>(brand); // Lỗi tiềm năng: ánh xạ brand (IQueryable) thay vì entity
+                return _mapper.Map<BrandDto>(brand); 
             }
             catch (Exception ex)
             {
