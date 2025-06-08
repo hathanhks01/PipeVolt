@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PipeVolt_BLL.IServices;
+using PipeVolt_DAL.DTOS;
 using System;
 using System.Threading.Tasks;
 
@@ -75,15 +76,49 @@ namespace PipeVolt_Api.Controllers
                 return StatusCode(500, $"Lỗi máy chủ: {ex.Message}");
             }
         }
-    }
-    public class CheckoutFullRequest
+        /// <summary>
+        /// Thanh toán tại quầy (POS) không cần giỏ hàng
+        /// </summary>
+        /// <param name="request">Danh sách sản phẩm, phương thức thanh toán, thông tin khách hàng (tùy chọn), ID nhân viên thu ngân, và phần trăm giảm giá</param>
+        /// <returns>ID của SalesOrder vừa tạo</returns>
+        [HttpPost("pos")]
+        public async Task<ActionResult<int>> PosCheckout([FromBody] PosCheckoutRequest request)
         {
-            public int PaymentMethodId { get; set; }
-        }
+            try
+            {
+                if (request == null || request.Items == null || !request.Items.Any())
+                {
+                    return BadRequest("Danh sách sản phẩm không hợp lệ.");
+                }
 
-        public class CheckoutPartialRequest
-        {
-            public int PaymentMethodId { get; set; }
-            public List<int> CartItemIds { get; set; }
+                var orderId = await _checkoutService.PosCheckoutAsync(
+                    request.Items,
+                    request.PaymentMethodId,
+                    request.CustomerInfo,
+                    request.CashierId,
+                    request.DiscountPercent);
+
+                return Ok(orderId);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi máy chủ: {ex.Message}");
+            }
         }
+    }
+
+    // DTO for POS checkout request
+    public class PosCheckoutRequest
+    {
+        public List<PosItem> Items { get; set; }
+        public int PaymentMethodId { get; set; }
+        public PosCustomerInfo? CustomerInfo { get; set; }
+        public int? CashierId { get; set; }
+        public decimal DiscountPercent { get; set; } = 0;
+    }
 }
+

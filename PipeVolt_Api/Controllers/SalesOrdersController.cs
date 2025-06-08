@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.DTOS;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace PipeVolt_Api.Controllers
@@ -68,6 +70,35 @@ namespace PipeVolt_Api.Controllers
             if (orders == null || orders.Count == 0)
                 return NotFound("Không tìm thấy đơn hàng cho user này.");
             return Ok(orders);
+        }
+
+        [HttpGet("print-bill/{orderId}")]
+        public async Task<ActionResult<object>> GetPrintBill(int orderId)
+        {
+            var query = await _service.QueryOrderWithDetails(orderId);
+            var order = await query.FirstOrDefaultAsync();
+
+            if (order == null)
+                return NotFound("Không tìm thấy đơn hàng.");
+
+            var result = new
+            {
+                orderCode = order.OrderCode,
+                orderDate = order.OrderDate,
+                customerName = order.Customer?.CustomerName,
+                items = order.OrderDetails.Select(od => new
+                {
+                    productId = od.ProductId,
+                    productName = od.Product?.ProductName,
+                    quantity = od.Quantity,
+                    unitPrice = od.UnitPrice
+                }).ToList(),
+                totalAmount = order.TotalAmount,
+                taxAmount = order.TaxAmount,
+                netAmount = order.NetAmount
+            };
+
+            return Ok(result);
         }
     }
 }

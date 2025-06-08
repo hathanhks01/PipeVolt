@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using static PipeVolt_DAL.Common.DataType;
+using Microsoft.EntityFrameworkCore;
 
 namespace PipeVolt_BLL.Services
 {
@@ -168,7 +169,7 @@ namespace PipeVolt_BLL.Services
                 Status = (int)SaleStatus.Pending,
                 PaymentMethodId = checkoutDto.PaymentMethodId,
                 TotalAmount = totalAmount,
-                
+
             };
 
             await _repo.Create(salesOrder);
@@ -178,7 +179,7 @@ namespace PipeVolt_BLL.Services
             {
                 var orderDetail = new OrderDetail
                 {
-                    OrderId = salesOrder.OrderId, 
+                    OrderId = salesOrder.OrderId,
                     ProductId = item.ProductId,
                     Quantity = item.Quantity,
                     UnitPrice = item.UnitPrice
@@ -220,6 +221,21 @@ namespace PipeVolt_BLL.Services
             _logger.LogInformation($"Fetched {salesOrderList.Count} sales orders for userId: {userId}");
 
             return _mapper.Map<List<SalesOrderDto>>(salesOrderList);
+        }
+
+        public async Task<IQueryable<SalesOrder>> QueryOrderWithDetails(int orderId)
+        {
+            _logger.LogInformation($"Querying sales order with details for OrderId: {orderId}");
+
+            var query = await _repo.QueryBy(o => o.OrderId == orderId);
+            var detailedQuery = query
+                .Include(o => o.Customer)
+                .Include(o => o.OrderDetails)
+                    .ThenInclude(od => od.Product);
+
+            _logger.LogInformation($"Query built for OrderId: {orderId}");
+
+            return detailedQuery;
         }
     }
 }
