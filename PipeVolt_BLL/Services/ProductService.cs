@@ -1,5 +1,7 @@
 ﻿using AutoMapper;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using PipeVolt_Api.Common;
 using PipeVolt_Api.Common.Repository;
 using PipeVolt_BLL.IServices;
@@ -35,8 +37,35 @@ namespace PipeVolt_BLL.Services
         {
             try
             {
-                var products = await _repo.QueryBy(p => p.ProductId == productId);
-                var product = await Task.Run(() => products.FirstOrDefault());
+                var sql = @"
+            SELECT 
+                p.product_id,
+                p.product_code,
+                p.product_name,
+                p.category_id,
+                p.brand_id,
+                p.selling_price,
+                p.unit,
+                p.description,
+                p.image_url,
+                ISNULL(SUM(i.quantity), 0) AS quantity
+            FROM PRODUCT p
+            LEFT JOIN INVENTORY i ON p.product_id = i.product_id
+            WHERE p.product_id = @p0
+            GROUP BY 
+                p.product_id,
+                p.product_code,
+                p.product_name,
+                p.category_id,
+                p.brand_id,
+                p.selling_price,
+                p.unit,
+                p.description,
+                p.image_url";
+
+                var productSearch = await _repo.SqlQuery<Product>(sql,productId);
+                var product = productSearch.FirstOrDefault();
+
                 if (product == null)
                     throw new KeyNotFoundException("Product not found.");
 
@@ -49,18 +78,79 @@ namespace PipeVolt_BLL.Services
             }
         }
 
-        public async Task<IEnumerable<ProductDto>> GetAllProductsAsync()
+        public async Task<ProductDto> GetProductByIdAndRelatedAsync(int productId)
         {
             try
             {
-                var products = await _repo.GetAll();
-                return _mapper.Map<IEnumerable<ProductDto>>(products);
+                var products = await _repo.QueryBy(p => p.ProductId == productId);
+                var product = await Task.Run(() => products.FirstOrDefault());
+                if (product == null)
+                    throw new KeyNotFoundException("Product not found.");
+
+                // Lấy các sản phẩm liên quan: cùng CategoryId, khác ProductId hiện tại, lấy tối đa 5 sản phẩm
+                List<Product> relatedProducts = new List<Product>();
+                if (product.CategoryId.HasValue)
+                {
+                    var relatedQuery = await _repo.QueryBy(p =>
+                        p.CategoryId == product.CategoryId &&
+                        p.ProductId != product.ProductId);
+                    relatedProducts = relatedQuery.Take(5).ToList();
+                }
+
+                var productDto = _mapper.Map<ProductDto>(product);
+
+                // Nếu ProductDto chưa có property RelatedProducts, bạn cần thêm vào class ProductDto:
+                // public List<ProductDto> RelatedProducts { get; set; }
+                // Nếu đã có, gán như sau:
+                if (productDto != null)
+                    productDto.RelatedProducts = _mapper.Map<List<ProductDto>>(relatedProducts);
+
+                return productDto;
             }
             catch (Exception ex)
             {
-                _logger.LogError("Error in GetAllProductsAsync", ex);
+                _logger.LogError("Error in GetProductByIdAsync", ex);
                 throw;
             }
+        }
+        public async Task<IEnumerable<ProductDto>> GetAllProductsAsync()
+        {
+           
+                try
+                {
+                    var sql = @"
+            SELECT 
+                p.product_id,
+                p.product_code,
+                p.product_name,
+                p.category_id,
+                p.brand_id,
+                p.selling_price,
+                p.unit,
+                p.description,
+                p.image_url,
+                ISNULL(SUM(i.quantity), 0) AS quantity
+            FROM PRODUCT p
+            LEFT JOIN INVENTORY i ON p.product_id = i.product_id
+            GROUP BY 
+                p.product_id,
+                p.product_code,
+                p.product_name,
+                p.category_id,
+                p.brand_id,
+                p.selling_price,
+                p.unit,
+                p.description,
+                p.image_url";
+
+                    var product = await _repo.SqlQuery<Product>(sql);
+                return _mapper.Map<IEnumerable<ProductDto>>(product);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Error in GetAllProductsAsync", ex);
+                    throw;
+                }
         }
         public async Task<IEnumerable<ProductDto>> GetPopularProductsAsync()
         {
@@ -224,5 +314,30 @@ namespace PipeVolt_BLL.Services
                 throw;
             }
         }
+        public async Task<List<ProductDto>> SearchTemp(string keyword)
+        {
+            try
+            {
+                string sql = @"
+                        SELECT a.* 
+                        FROM PRODUCT a 
+                        LEFT JOIN PRODUCT_CATEGORY b ON a.category_id = b.category_id 
+                        left join BRAND c on a.brand_id =c.brand_id 
+                        WHERE a.product_name LIKE @p0 OR b.category_name LIKE @p0 OR c.brand_name LIKE @p0";
+
+                string likeKeyword = $"%{keyword?.Trim()}%";
+                var list = await _repo.SqlQuery<Product>(sql, likeKeyword);
+                var result = _mapper.Map<List<ProductDto>>(list);
+                _logger.LogInformation($"Found {result.Count} products matching keyword '{keyword}'");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in SearchTemp with keyword: {keyword}", ex);
+                throw;
+            }
+        }
+
+
     }
 }

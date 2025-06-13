@@ -14,6 +14,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using static PipeVolt_DAL.Common.DataType;
+using Google.Apis.Auth;
 
 namespace PipeVolt_BLL.Services
 {
@@ -175,6 +176,92 @@ namespace PipeVolt_BLL.Services
                );   
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+        public async Task<AuthResponseDto> GoogleLoginAsync(GoogleLoginDto googleLoginDto)
+        {
+            try
+            {
+                // Verify Google ID Token
+                var payload = await GoogleJsonWebSignature.ValidateAsync(googleLoginDto.IdToken, new GoogleJsonWebSignature.ValidationSettings()
+                {
+                    Audience = new[] { _configuration["Google:ClientId"] }
+                });
+
+                if (payload == null)
+                {
+                    _logger.LogWarning("Google token validation failed");
+                    return new AuthResponseDto { Success = false, Message = "Invalid Google token" };
+                }
+
+                // Tìm user theo email từ Google
+                var existingUser = await IUserAccountRepository.FindByUsernameAsync(payload.Email);
+
+                UserAccount user;
+                Customer customer;
+
+                if (existingUser != null)
+                {
+                    // User đã tồn tại, đăng nhập
+                    user = existingUser;
+                    if (user.Status != 1)
+                    {
+                        _logger.LogWarning($"Login attempt with inactive Google account: {payload.Email}");
+                        return new AuthResponseDto { Success = false, Message = "Account is inactive or suspended" };
+                    }
+                }
+                else
+                {
+                    // User chưa tồn tại, tạo mới
+                    string code = await ICustomerRepository.RenderCodeAsync();
+                    customer = new Customer
+                    {
+                        CustomerCode = code,
+                        CustomerName = payload.Name,
+                        Email = payload.Email,
+                        RegistrationDate = new DateOnly(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day)
+                    };
+                    await _CusGenericRepository.Create(customer);
+
+                    user = new UserAccount
+                    {
+                        Username = payload.Email,
+                        Password = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()), // Random password for Google users
+                        UserType = (int)UserType.Customer,
+                        CustomerId = customer.CustomerId,
+                        Status = (int)UserStatus.Active,
+                       // IsGoogleUser = true // Thêm field này vào model nếu cần
+                    };
+                    await _UserGenericRepository.Create(user);
+
+                    // Tạo cart cho user mới
+                    var cart = new Cart
+                    {
+                        CartId = user.UserId,
+                        CustomerId = customer.CustomerId,
+                    };
+                    await _CartGenericRepository.Create(cart);
+
+                    _logger.LogInformation($"New Google user {payload.Email} registered successfully");
+                }
+
+                var token = GenerateJwtToken(user);
+                _logger.LogInformation($"Google user {payload.Email} logged in successfully");
+
+                return new AuthResponseDto
+                {
+                    Success = true,
+                    Message = "Google login successful",
+                    Token = token,
+                    Username = user.Username,
+                    UserType = user.UserType,
+                    UserId = user.UserId
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error occurred during Google login", ex);
+                return new AuthResponseDto { Success = false, Message = "An error occurred during Google login" };
+            }
         }
         private bool IsValidUserType(int userType)
         {
