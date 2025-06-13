@@ -49,6 +49,17 @@ namespace PipeVolt_Api.Controllers
             HttpContext.Session.Remove("JwtToken");
             return Ok(result); 
         }
+        [HttpPost("GoogleLogin")]
+        public async Task<ActionResult> GoogleLoginAsync(GoogleLoginDto googleLoginDto)
+        {
+            var result = await _authService.GoogleLoginAsync(googleLoginDto);
+            if (!result.Success)
+                return BadRequest(result);
+
+            HttpContext.Session.Remove("JwtToken");
+            HttpContext.Session.SetString("JwtToken", result.Token);
+            return Ok(result);
+        }
 
     }
 }

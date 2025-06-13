@@ -12,5 +12,6 @@ namespace PipeVolt_BLL.IServices
         Task<AuthResponseDto> LoginAsync(LoginDto loginDto);
         AuthResponseDto Logout(string username);
         Task<AuthResponseDto> RegisterAsync(RegisterDto registerDTO);
+        Task<AuthResponseDto> GoogleLoginAsync(GoogleLoginDto googleLoginDto);
     }
 }

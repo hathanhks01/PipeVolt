@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using PipeVolt_DAL.Common; // Thêm using cho enums
+using PipeVolt_DAL.Common; 
 using System.Text;
 using static PipeVolt_DAL.Common.DataType;
 
@@ -54,6 +55,17 @@ namespace PipeVolt_Api.Configurations
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["JWT:Key"]))
                 };
             });
+        }
+        public static void AddGoogleAuthentication(this IServiceCollection services, IConfiguration configuration)
+        {
+            services.AddAuthentication()
+                .AddGoogle(GoogleDefaults.AuthenticationScheme, options =>
+                {
+                    options.ClientId = configuration["Google:ClientId"];
+                    options.ClientSecret = configuration["Google:ClientSecret"];
+                    options.CallbackPath = "/signin-google";
+                    options.SignInScheme = JwtBearerDefaults.AuthenticationScheme;
+                });
         }
     }
 }

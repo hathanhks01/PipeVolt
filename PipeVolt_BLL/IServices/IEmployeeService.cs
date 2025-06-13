@@ -1,4 +1,5 @@
 ﻿using PipeVolt_DAL.DTOS;
+using PipeVolt_DAL.DTOS.PipeVolt_DAL.DTOS;
 
 namespace PipeVolt_BLL.IServices
 {
@@ -9,5 +10,7 @@ namespace PipeVolt_BLL.IServices
         Task<List<EmployeeDto>> GetAllAsync();
         Task<EmployeeDto> GetByIdAsync(int id);
         Task<EmployeeDto> UpdateAsync(int id, UpdateEmployeeDto dto);
+        Task<UserAccountDto> GenerateUserAccountForEmployee(int employeeId);
+
     }
 }

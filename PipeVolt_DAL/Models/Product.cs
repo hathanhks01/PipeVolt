@@ -37,6 +37,8 @@ public partial class Product
     [Column("description")]
     public string? Description { get; set; }
 
+    public int? quantity { get; set; } 
+
     [Column("image_url")]
     [StringLength(255)]
     public string? ImageUrl { get; set; }

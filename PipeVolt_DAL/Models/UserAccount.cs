@@ -39,6 +39,7 @@ public partial class UserAccount
     public virtual Customer? Customer { get; set; }
 
     [ForeignKey("EmployeeId")]
-    [InverseProperty("UserAccounts")]
+    [InverseProperty("UserAccount")] 
     public virtual Employee? Employee { get; set; }
+
 }

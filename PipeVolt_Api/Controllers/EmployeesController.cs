@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.DTOS;
 
@@ -48,6 +49,20 @@ namespace PipeVolt_Api.Controllers
         {
             try { await _svc.DeleteAsync(id); return NoContent(); }
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
+        }
+        [HttpPost("generateAccount")]
+        [Authorize(Policy = "RequireAdmin")]
+        public async Task<IActionResult> GenerateAccount(int EmployeeId)
+        {
+            try
+            {
+                var result = await _svc.GenerateUserAccountForEmployee(EmployeeId);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
         }
     }
 

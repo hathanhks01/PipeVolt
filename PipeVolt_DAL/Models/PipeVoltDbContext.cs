@@ -198,7 +198,11 @@ public partial class PipeVoltDbContext : DbContext
 
             entity.HasOne(d => d.Customer).WithMany(p => p.UserAccounts).HasConstraintName("FK__USER_ACCO__custo__5FB337D6");
 
-            entity.HasOne(d => d.Employee).WithMany(p => p.UserAccounts).HasConstraintName("FK__USER_ACCO__emplo__5EBF139D");
+            entity.HasOne(d => d.Employee)
+                   .WithOne(p => p.UserAccount) // 
+                   .HasForeignKey<UserAccount>(d => d.EmployeeId)
+                   .HasConstraintName("FK__USER_ACCO__emplo__5EBF139D");
+
         });
 
         modelBuilder.Entity<Warehouse>(entity =>

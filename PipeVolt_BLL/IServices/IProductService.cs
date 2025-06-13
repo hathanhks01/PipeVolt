@@ -11,5 +11,6 @@ namespace PipeVolt_BLL.Services
         Task<ProductDto> GetProductByIdAsync(int productId);
         Task<ProductDto> UpdateProductAsync(int productId, UpdateProductDto productDto);
         Task<List<ProductDto>> GetProductsByCategoryIdAsync(int categoryId);
+        Task<List<ProductDto>> SearchTemp(string keyword);
     }
 }

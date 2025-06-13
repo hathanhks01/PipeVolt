@@ -114,5 +114,28 @@ namespace PipeVolt.Controllers
                 return StatusCode(500, $"Lỗi máy chủ: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// Tìm kiếm sản phẩm theo từ khóa (tên sản phẩm hoặc tên danh mục hoặc tên brand).
+        /// </summary>
+        /// <param name="keyword">Từ khóa tìm kiếm</param>
+        /// <returns>Danh sách sản phẩm phù hợp</returns>
+        [HttpGet("searchTemp")]
+        public async Task<ActionResult<List<ProductDto>>> SearchTemp([FromQuery] string keyword)
+        {
+            if (string.IsNullOrWhiteSpace(keyword))
+                return BadRequest("Từ khóa tìm kiếm không được để trống.");
+
+            try
+            {
+                // Gọi service SearchTemp (nên đổi tên thành SearchProductsAsync nếu dùng thực tế)
+                var products = await (_productService as ProductService).SearchTemp(keyword);
+                return Ok(products);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi máy chủ: {ex.Message}");
+            }
+        }
     }
 }
