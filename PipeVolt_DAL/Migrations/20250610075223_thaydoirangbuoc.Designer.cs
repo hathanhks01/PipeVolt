@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PipeVolt_DAL.Models;
 
@@ -11,9 +12,11 @@ using PipeVolt_DAL.Models;
 namespace PipeVolt_DAL.Migrations
 {
     [DbContext(typeof(PipeVoltDbContext))]
-    partial class PipeVoltDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250610075223_thaydoirangbuoc")]
+    partial class thaydoirangbuoc
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -764,9 +767,6 @@ namespace PipeVolt_DAL.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("unit");
-
-                    b.Property<int?>("quantity")
-                        .HasColumnType("int");
 
                     b.HasKey("ProductId")
                         .HasName("PK__PRODUCT__47027DF521C9A1DD");

@@ -24,42 +24,71 @@ namespace PipeVolt_BLL.Services
         }
 
         public async Task<ChatRoomDto> CreateChatRoomAsync(CreateChatRoomDto createDto)
+{
+    _logger.LogInformation($"[CreateOrReopenChatRoomAsync] Processing chat room for customer {createDto.CustomerId}, employee {createDto.EmployeeId}");
+
+    try
+    {
+        // Tìm phòng chat gần nhất của khách hàng (bao gồm cả đã đóng)
+        var existingRoom = await _context.ChatRooms
+            .Where(r => r.CustomerId == createDto.CustomerId)
+            .OrderByDescending(r => r.LastMessageAt ?? r.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (existingRoom != null)
         {
-            _logger.LogInformation($"[CreateChatRoomAsync] Creating chat room for customer {createDto.CustomerId}, employee {createDto.EmployeeId}");
-
-            try
+            if (existingRoom.Status == (int)ChatRoomStatus.Active) 
             {
-                var existingRoom = await _context.ChatRooms
-                    .FirstOrDefaultAsync(r => r.CustomerId == createDto.CustomerId &&
-                                             r.Status == 1);
-
-                if (existingRoom != null)
+                // Phòng đang hoạt động
+                _logger.LogInformation($"[CreateOrReopenChatRoomAsync] Found active chat room {existingRoom.ChatRoomId} for customer {createDto.CustomerId}");
+                return await MapToChatRoomDto(existingRoom);
+            }
+            else 
+            {
+                // Mở lại phòng đã đóng
+                _logger.LogInformation($"[CreateOrReopenChatRoomAsync] Reopening closed chat room {existingRoom.ChatRoomId} for customer {createDto.CustomerId}");
+                
+                existingRoom.Status = (int)ChatRoomStatus.Active;
+                existingRoom.EmployeeId = createDto.EmployeeId;
+                existingRoom.UpdatedAt = DateTime.Now;
+                
+                // Cập nhật room name nếu được cung cấp
+                if (!string.IsNullOrEmpty(createDto.RoomName))
                 {
-                    _logger.LogInformation($"[CreateChatRoomAsync] Existing chat room found for customer {createDto.CustomerId}: {existingRoom.ChatRoomId}");
-                    return await MapToChatRoomDto(existingRoom);
+                    existingRoom.RoomName = createDto.RoomName;
                 }
 
-                var chatRoom = new ChatRoom
-                {
-                    CustomerId = createDto.CustomerId,
-                    EmployeeId = createDto.EmployeeId,
-                    RoomName = createDto.RoomName ?? $"Chat với khách hàng #{createDto.CustomerId}",
-                    Status = 1
-                };
-
-                _context.ChatRooms.Add(chatRoom);
                 await _context.SaveChangesAsync();
-
-                _logger.LogInformation($"[CreateChatRoomAsync] Created new chat room {chatRoom.ChatRoomId} for customer {createDto.CustomerId}");
-
-                return await MapToChatRoomDto(chatRoom);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("[CreateChatRoomAsync] Error creating chat room", ex);
-                throw;
+                
+                _logger.LogInformation($"[CreateOrReopenChatRoomAsync] Successfully reopened chat room {existingRoom.ChatRoomId}");
+                return await MapToChatRoomDto(existingRoom);
             }
         }
+
+        // Tạo phòng mới nếu chưa có
+        _logger.LogInformation($"[CreateOrReopenChatRoomAsync] Creating new chat room for customer {createDto.CustomerId}");
+        
+        var chatRoom = new ChatRoom
+        {
+            CustomerId = createDto.CustomerId,
+            EmployeeId = createDto.EmployeeId,
+            RoomName = createDto.RoomName ?? $"Chat với khách hàng #{createDto.CustomerId}",
+            Status = (int)ChatRoomStatus.Active
+        };
+
+        _context.ChatRooms.Add(chatRoom);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation($"[CreateOrReopenChatRoomAsync] Created new chat room {chatRoom.ChatRoomId} for customer {createDto.CustomerId}");
+
+        return await MapToChatRoomDto(chatRoom);
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError("[CreateOrReopenChatRoomAsync] Error processing chat room", ex);
+        throw;
+    }
+}
 
         public async Task<List<ChatRoomDto>> GetChatRoomsForCustomerAsync(int customerId)
         {

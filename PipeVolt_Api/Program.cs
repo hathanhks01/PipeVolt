@@ -1,14 +1,16 @@
-﻿using Microsoft.EntityFrameworkCore;
-using PipeVolt_DAL;
-using PipeVolt_DAL.IRepositories;
-using PipeVolt_DAL.Repositories;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using PipeVolt_Api.Common.Repository;
+using PipeVolt_Api.Configurations;
 using PipeVolt_BLL.IServices;
 using PipeVolt_BLL.Services;
+using PipeVolt_DAL;
+using PipeVolt_DAL.IRepositories;
 using PipeVolt_DAL.Models;
-using PipeVolt_Api.Common.Repository;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
+using PipeVolt_DAL.Repositories;
 using System.Text;
+using Microsoft.AspNetCore.Authentication.Google;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,20 +33,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["JWT:Issuer"],
-            ValidAudience = builder.Configuration["JWT:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JWT:Key"]))
-        };
-    });
+
 builder.Services.AddDistributedMemoryCache(); // Lưu trữ session trong bộ nhớ
 builder.Services.AddSession(options =>
 {
@@ -112,9 +101,16 @@ builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IUserAccountService, UserAccountService>();
 builder.Services.AddScoped<ICheckoutService,CheckoutService>();
 builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddScoped<IAIChatbotService, AIChatbotService>();
 // Logger
 builder.Services.AddScoped<ILoggerService, LoggerService>();
+// Đăng ký JWT và Policy Authorization
+builder.Services.AddJwtAuthentication(builder.Configuration);
+builder.Services.AddGoogleAuthentication(builder.Configuration);
+builder.Services.AddAuthorizationPolicies();
 
+
+builder.Services.AddHttpClient();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

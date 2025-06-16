@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PipeVolt_DAL.Models;
 
@@ -11,9 +12,11 @@ using PipeVolt_DAL.Models;
 namespace PipeVolt_DAL.Migrations
 {
     [DbContext(typeof(PipeVoltDbContext))]
-    partial class PipeVoltDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250606095252_updateDataType")]
+    partial class updateDataType
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -765,9 +768,6 @@ namespace PipeVolt_DAL.Migrations
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("unit");
 
-                    b.Property<int?>("quantity")
-                        .HasColumnType("int");
-
                     b.HasKey("ProductId")
                         .HasName("PK__PRODUCT__47027DF521C9A1DD");
 
@@ -1088,9 +1088,7 @@ namespace PipeVolt_DAL.Migrations
 
                     b.HasIndex("CustomerId");
 
-                    b.HasIndex("EmployeeId")
-                        .IsUnique()
-                        .HasFilter("[employee_id] IS NOT NULL");
+                    b.HasIndex("EmployeeId");
 
                     b.HasIndex(new[] { "Username" }, "UQ__USER_ACC__F3DBC5721AE09BBF")
                         .IsUnique();
@@ -1454,8 +1452,8 @@ namespace PipeVolt_DAL.Migrations
                         .HasConstraintName("FK__USER_ACCO__custo__5FB337D6");
 
                     b.HasOne("PipeVolt_DAL.Models.Employee", "Employee")
-                        .WithOne("UserAccount")
-                        .HasForeignKey("PipeVolt_DAL.Models.UserAccount", "EmployeeId")
+                        .WithMany("UserAccounts")
+                        .HasForeignKey("EmployeeId")
                         .HasConstraintName("FK__USER_ACCO__emplo__5EBF139D");
 
                     b.Navigation("Customer");
@@ -1524,7 +1522,7 @@ namespace PipeVolt_DAL.Migrations
 
                     b.Navigation("SalesOrders");
 
-                    b.Navigation("UserAccount");
+                    b.Navigation("UserAccounts");
                 });
 
             modelBuilder.Entity("PipeVolt_DAL.Models.Invoice", b =>

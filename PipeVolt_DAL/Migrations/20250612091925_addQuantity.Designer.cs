@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PipeVolt_DAL.Models;
 
@@ -11,9 +12,11 @@ using PipeVolt_DAL.Models;
 namespace PipeVolt_DAL.Migrations
 {
     [DbContext(typeof(PipeVoltDbContext))]
-    partial class PipeVoltDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250612091925_addQuantity")]
+    partial class addQuantity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

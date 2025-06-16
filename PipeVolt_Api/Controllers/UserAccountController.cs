@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using PipeVolt_BLL.IServices;
 using PipeVolt_BLL.Services;
 using PipeVolt_DAL.DTOS.PipeVolt_DAL.DTOS;
@@ -19,6 +20,7 @@ namespace PipeVolt_Api.Controllers
         // GET: api/useraccounts
         [HttpGet]
         [Route("GetList")]
+        [Authorize(Policy = "RequireAdmin")]
         public async Task<ActionResult<List<UserAccountDto>>> GetAllUserAccounts()
         {
             try
@@ -116,6 +118,7 @@ namespace PipeVolt_Api.Controllers
 
         // DELETE: api/useraccounts/{id}
         [HttpDelete("{id}")]
+        [Authorize(Policy = "RequireAdmin")]
         public async Task<ActionResult> DeleteUserAccount(int id)
         {
             try

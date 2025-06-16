@@ -14,6 +14,7 @@ namespace PipeVolt_Api.Controllers
 
         [HttpGet]
         [Route("GetList")]
+        [Authorize(Policy = "RequireAdmin")]
         public async Task<IActionResult> GetAll()
             => Ok(await _svc.GetAllAsync());
 
@@ -25,6 +26,7 @@ namespace PipeVolt_Api.Controllers
         }
 
         [HttpPost]
+        [Authorize(Policy = "RequireAdmin")]
         public async Task<IActionResult> Create(CreateEmployeeDto dto)
         {
             var created = await _svc.CreateAsync(dto);
@@ -33,6 +35,7 @@ namespace PipeVolt_Api.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Policy = "RequireAdmin")]
         public async Task<IActionResult> Update(int id, UpdateEmployeeDto dto)
         {
             if (id != dto.EmployeeId) return BadRequest("ID mismatch");
@@ -45,6 +48,7 @@ namespace PipeVolt_Api.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Policy = "RequireAdmin")]
         public async Task<IActionResult> Delete(int id)
         {
             try { await _svc.DeleteAsync(id); return NoContent(); }

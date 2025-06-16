@@ -11,7 +11,8 @@ namespace PipeVolt_DAL.DTOS
         public int PaymentMethodId { get; set; }
     }
 
-    public class CheckoutPartialRequest
+    public class 
+        CheckoutPartialRequest
     {
         public int PaymentMethodId { get; set; }
         public List<int> CartItemIds { get; set; }

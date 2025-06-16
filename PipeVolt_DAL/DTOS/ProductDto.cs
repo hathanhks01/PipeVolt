@@ -20,7 +20,8 @@ namespace PipeVolt_DAL.DTOS
         public string? Unit { get; set; }
         public string? Description { get; set; }
         public string? ImageUrl { get; set; }
-
+        public int ? quantity { get; set; }
+        public List<ProductDto> RelatedProducts { get; set; }
         public string CategoryName { get; set; } = null!; // Thêm thông tin của Category
         public string BrandName { get; set; } = null!;    // Thêm thông tin của Brand
     }
