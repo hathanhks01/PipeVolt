@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.DTOS;
 
@@ -22,11 +23,18 @@ namespace PipeVolt_Api.Controllers
             catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
         }
 
-        [HttpPost]
+        [HttpPost("add-PurchaseOrders")]
         public async Task<ActionResult<PurchaseOrderDto>> Create(CreatePurchaseOrderDto dto)
         {
-            var created = await _service.AddPurchaseOrderAsync(dto);
-            return CreatedAtAction(nameof(Get), new { id = created.PurchaseOrderId }, created);
+            try
+            {
+                var created = await _service.AddPurchaseOrderAsync(dto);
+                return CreatedAtAction(nameof(Get), new { id = created.PurchaseOrderId }, created);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = "Failed to create purchase order", message = ex.Message, details = ex.InnerException?.Message });
+            }
         }
 
         [HttpPut("{id}")]

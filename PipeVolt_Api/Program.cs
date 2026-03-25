@@ -102,6 +102,7 @@ builder.Services.AddScoped<IUserAccountService, UserAccountService>();
 builder.Services.AddScoped<ICheckoutService,CheckoutService>();
 builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<IAIChatbotService, AIChatbotService>();
+builder.Services.AddScoped<IReportService, ReportService>();
 // Logger
 builder.Services.AddScoped<ILoggerService, LoggerService>();
 // Đăng ký JWT và Policy Authorization

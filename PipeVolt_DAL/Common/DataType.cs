@@ -76,6 +76,15 @@ namespace PipeVolt_DAL.Common
             UnPaid=1,
             Partial =2
         }
-
+        public enum PurchaseOrderStatus
+        {
+            Draft = 0,
+            Submitted = 1,
+            Approved = 2,
+            Rejected = 3,
+            Processing = 4,
+            Completed = 5,
+            Cancelled = 6
+        }
     }
 }

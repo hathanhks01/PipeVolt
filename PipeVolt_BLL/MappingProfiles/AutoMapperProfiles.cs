@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using PipeVolt_DAL.DTOS;
 using PipeVolt_DAL.DTOS.PipeVolt_DAL.DTOS;
 using PipeVolt_DAL.Models;
@@ -53,8 +53,12 @@ public class AutoMapperProfiles : Profile
         // PurchaseOrder
         CreateMap<PurchaseOrder, PurchaseOrderDto>();
         CreateMap<CreatePurchaseOrderDto, PurchaseOrder>()
-            .ForMember(dest => dest.PurchaseOrderId, opt => opt.Ignore());
-        CreateMap<UpdatePurchaseOrderDto, PurchaseOrder>();
+            .ForMember(dest => dest.PurchaseOrderId, opt => opt.Ignore())
+            .ForMember(dest => dest.PurchaseOrderCode, opt => opt.Ignore())
+            .ForMember(dest => dest.EmployeeId, opt => opt.Ignore());
+        CreateMap<UpdatePurchaseOrderDto, PurchaseOrder>()
+            .ForMember(dest => dest.PurchaseOrderCode, opt => opt.Ignore())
+            .ForMember(dest => dest.EmployeeId, opt => opt.Ignore());
 
         // PurchaseOrderDetail
         CreateMap<PurchaseOrderDetail, PurchaseOrderDetailDto>();
