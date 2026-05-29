@@ -32,7 +32,7 @@ namespace PipeVolt_DAL.Models
         public DateTime TransactionDate { get; set; } = DateTime.Now;
 
         [Column("status")]
-      
+        
         public int? Status { get; set; } 
 
         [Column("gateway_response")]

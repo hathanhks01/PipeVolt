@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -62,8 +62,6 @@ public partial class Product
     [InverseProperty("Product")]
     public virtual ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();
 
-    [InverseProperty("Product")]
-    public virtual ICollection<Supply> Supplies { get; set; } = new List<Supply>();
 
     [InverseProperty("Product")]
     public virtual ICollection<Warranty> Warranties { get; set; } = new List<Warranty>();

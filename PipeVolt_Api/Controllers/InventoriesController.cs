@@ -52,8 +52,19 @@ namespace PipeVolt_Api.Controllers
         [HttpPost("ReceiveFromPurchaseOrder")]
         public async Task<IActionResult> ReceiveFromPurchaseOrder([FromBody] ReceivePurchaseOrderDto dto)
         {
-            await _service.ReceiveFromPurchaseOrderAsync(dto.WarehouseCode, dto.PurchaseOrderId);
-            return Ok("Nhập kho thành công từ đơn hàng mua.");
+            try
+            {
+                await _service.ReceiveFromPurchaseOrderAsync(dto.WarehouseCode, dto.PurchaseOrderCode);
+                return Ok("Nhập kho thành công từ đơn hàng mua.");
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);   // 404 với message rõ ràng
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
         }
         [HttpPost]
         public async Task<ActionResult<InventoryDto>> Create(CreateInventoryDto dto)

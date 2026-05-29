@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -29,7 +29,7 @@ namespace PipeVolt_DAL.Models
         public int OrderId { get; set; }
 
         [Column("customer_id")]
-        public int CustomerId { get; set; }
+        public int? CustomerId { get; set; }
 
         [Column("employee_id")]
         public int? EmployeeId { get; set; }
@@ -99,7 +99,7 @@ namespace PipeVolt_DAL.Models
 
         [ForeignKey("CustomerId")]
         [InverseProperty("Invoices")]
-        public virtual Customer Customer { get; set; } = null!;
+        public virtual Customer? Customer { get; set; }
 
         [ForeignKey("EmployeeId")]
         [InverseProperty("Invoices")]

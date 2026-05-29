@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using Microsoft.EntityFrameworkCore; // Added for Include and FirstOrDefaultAsync
 using PipeVolt_Api.Common.Repository;
 using PipeVolt_BLL.IServices;
@@ -68,334 +68,340 @@ namespace PipeVolt_BLL.Services
         {
             _logger.LogInformation($"Starting checkout process for customer {customerId} with payment method {paymentMethodId}");
 
-            using (var transaction = await _unitOfWork.Context.Database.BeginTransactionAsync())
+            var executionStrategy = _unitOfWork.Context.Database.CreateExecutionStrategy();
+
+            return await executionStrategy.ExecuteAsync(async () =>
             {
-                try
+                using (var transaction = await _unitOfWork.Context.Database.BeginTransactionAsync())
                 {
-                    // 1. Kiểm tra giỏ hàng
-                    var cartQuery = await _cartRepo.QueryBy(c => c.CustomerId == customerId);
-                    var cart = await cartQuery
-                        .Include(c => c.CartItems)
-                        .ThenInclude(ci => ci.Product)
-                        .Include(c => c.Customer)
-                        .FirstOrDefaultAsync();
-
-                    if (cart == null)
+                    try
                     {
-                        _logger.LogWarning($"Cart not found for customer {customerId}");
-                        throw new KeyNotFoundException("Giỏ hàng không tồn tại.");
-                    }
+                        // 1. Kiểm tra giỏ hàng
+                        var cartQuery = await _cartRepo.QueryBy(c => c.CustomerId == customerId);
+                        var cart = await cartQuery
+                            .Include(c => c.CartItems)
+                            .ThenInclude(ci => ci.Product)
+                            .Include(c => c.Customer)
+                            .FirstOrDefaultAsync();
 
-                    if (!cart.CartItems.Any())
-                    {
-                        _logger.LogWarning($"Cart is empty for customer {customerId}");
-                        throw new InvalidOperationException("Giỏ hàng trống.");
-                    }
-
-                    // 2. Kiểm tra phương thức thanh toán
-                    var paymentMethodQuery = await _paymentMethodRepo.QueryBy(pm => pm.PaymentMethodId == paymentMethodId);
-                    var paymentMethod = await paymentMethodQuery.FirstOrDefaultAsync();
-                    if (paymentMethod == null)
-                    {
-                        _logger.LogWarning($"Payment method {paymentMethodId} not found");
-                        throw new InvalidOperationException("Phương thức thanh toán không tồn tại.");
-                    }
-
-                    // 3. Kiểm tra tồn kho
-                    foreach (var item in cart.CartItems)
-                    {
-                        var inventoryQuery = await _inventoryRepo.QueryBy(i => i.ProductId == item.ProductId);
-                        var inventory = await inventoryQuery.FirstOrDefaultAsync();
-                        if (inventory == null || inventory.Quantity < item.Quantity)
+                        if (cart == null)
                         {
-                            _logger.LogWarning($"Insufficient stock for product {item.ProductId}");
-                            throw new InvalidOperationException($"Sản phẩm {item.Product?.ProductName} không đủ tồn kho.");
+                            _logger.LogWarning($"Cart not found for customer {customerId}");
+                            throw new KeyNotFoundException("Giỏ hàng không tồn tại.");
                         }
+
+                        if (!cart.CartItems.Any())
+                        {
+                            _logger.LogWarning($"Cart is empty for customer {customerId}");
+                            throw new InvalidOperationException("Giỏ hàng trống.");
+                        }
+
+                        // 2. Kiểm tra phương thức thanh toán
+                        var paymentMethodQuery = await _paymentMethodRepo.QueryBy(pm => pm.PaymentMethodId == paymentMethodId);
+                        var paymentMethod = await paymentMethodQuery.FirstOrDefaultAsync();
+                        if (paymentMethod == null)
+                        {
+                            _logger.LogWarning($"Payment method {paymentMethodId} not found");
+                            throw new InvalidOperationException("Phương thức thanh toán không tồn tại.");
+                        }
+
+                        // 3. Kiểm tra tồn kho
+                        foreach (var item in cart.CartItems)
+                        {
+                            var inventoryList = await (await _inventoryRepo.QueryBy(i => i.ProductId == item.ProductId))
+                                .OrderBy(i => i.UpdatedAt) // FIFO: nhập trước xuất trước
+                                .ToListAsync();
+                            var totalStock = inventoryList.Sum(i => i.Quantity);
+                            if (totalStock < item.Quantity)
+                            {
+                                _logger.LogWarning($"Insufficient stock for product {item.ProductId}");
+                                throw new InvalidOperationException($"Sản phẩm {item.Product?.ProductName} không đủ tồn kho.");
+                            }
+                        }
+
+                        // 4. Tạo SalesOrder
+                        var salesOrder = new SalesOrder
+                        {
+                            OrderCode = GenerateOrderCode(),
+                            CustomerId = customerId,
+                            OrderDate = DateTime.Now,
+                            TotalAmount = cart.CartItems.Sum(ci => ci.LineTotal),
+                            DiscountAmount = 0, // Có thể thêm logic giảm giá
+                            TaxAmount = cart.CartItems.Sum(ci => ci.LineTotal) * 0.1, // Giả sử thuế 10%
+                            NetAmount = cart.CartItems.Sum(ci => ci.LineTotal) * 1.1, // Tổng sau thuế
+                            Status = (int)SaleStatus.Completed,
+                            PaymentMethodId = paymentMethodId
+                        };
+
+                        var createdOrder = await _salesOrderRepo.Create(salesOrder);
+
+                        // 5. Tạo OrderDetail
+                        var orderDetails = cart.CartItems.Select(ci => new OrderDetail
+                        {
+                            OrderId = createdOrder.OrderId,
+                            ProductId = ci.ProductId,
+                            Quantity = ci.Quantity,
+                            UnitPrice = ci.UnitPrice,
+                            Discount = 0, // Có thể thêm logic giảm giá
+                            LineTotal = ci.Quantity * ci.UnitPrice
+                        }).ToList();
+
+                        await _orderDetailRepo.Create(orderDetails);
+
+                        // 6. Tạo Invoice
+                        var invoice = new Invoice
+                        {
+                            InvoiceNumber = GenerateInvoiceNumber(),
+                            OrderId = createdOrder.OrderId,
+                            CustomerId = customerId,
+                            CustomerName = cart.Customer?.CustomerName ?? "Unknown",
+                            CustomerAddress = cart.Customer?.Address,
+                            CustomerPhone = cart.Customer?.Phone,
+                            CustomerTaxCode = cart.Customer?.TaxCode,
+                            IssueDate = DateTime.Now,
+                            DueDate = DateTime.Now.AddDays(30),
+                            SubTotal = salesOrder.TotalAmount ?? 0,
+                            VatRate = 0.1,
+                            VatAmount = salesOrder.TaxAmount ?? 0,
+                            TotalAmount = salesOrder.NetAmount ?? 0,
+                            Status = (int)DataType.InvoiceStatus.Draft,
+                            PaymentStatus = (int)DataType.PaymentStatus.UnPaid
+                        };
+
+                        var createdInvoice = await _invoiceRepo.Create(invoice);
+
+                        // 7. Tạo InvoiceDetail
+                        var invoiceDetails = cart.CartItems.Select(ci => new InvoiceDetail
+                        {
+                            InvoiceId = createdInvoice.InvoiceId,
+                            ProductId = ci.ProductId,
+                            ProductName = ci.Product?.ProductName ?? "Unknown",
+                            ProductCode = ci.Product?.ProductCode ?? "Unknown",
+                            Unit = ci.Product?.Unit,
+                            Quantity = ci.Quantity,
+                            UnitPrice = ci.UnitPrice,
+                            Discount = 0
+                        }).ToList();
+
+                        await _invoiceDetailRepo.Create(invoiceDetails);
+
+                        // 8. Tạo PaymentTransaction
+                        var paymentTransaction = new PaymentTransaction
+                        {
+                            OrderId = createdOrder.OrderId,
+                            PaymentMethodId = paymentMethodId,
+                            TransactionCode = GenerateTransactionCode(),
+                            Amount = salesOrder.NetAmount ?? 0,
+                            TransactionDate = DateTime.Now,
+                            Status = (int)PaymentTransactionStatus.Success // Giả sử thanh toán thành công
+                        };
+
+                        await _paymentTransactionRepo.Create(paymentTransaction);
+
+                        // 9. Cập nhật tồn kho
+                        foreach (var item in cart.CartItems)
+                        {
+                            await DeductInventoryFifoAsync(item.ProductId, item.Quantity);
+                        }
+
+                        // 10. Xóa CartItems
+                        await _cartItemRepo.DeleteRange(ci => ci.CartId == cart.CartId);
+
+                        // 11. Commit transaction
+                        await transaction.CommitAsync();
+                        _logger.LogInformation($"Checkout completed for customer {customerId}. Order ID: {createdOrder.OrderId}");
+
+                        return createdOrder.OrderId;
                     }
-
-                    // 4. Tạo SalesOrder
-                    var salesOrder = new SalesOrder
+                    catch (Exception ex)
                     {
-                        OrderCode = GenerateOrderCode(),
-                        CustomerId = customerId,
-                        OrderDate = DateTime.Now,
-                        TotalAmount = cart.CartItems.Sum(ci => ci.LineTotal),
-                        DiscountAmount = 0, // Có thể thêm logic giảm giá
-                        TaxAmount = cart.CartItems.Sum(ci => ci.LineTotal) * 0.1, // Giả sử thuế 10%
-                        NetAmount = cart.CartItems.Sum(ci => ci.LineTotal) * 1.1, // Tổng sau thuế
-                        Status = (int)SaleStatus.Completed,
-                        PaymentMethodId = paymentMethodId
-                    };
-
-                    var createdOrder = await _salesOrderRepo.Create(salesOrder);
-
-                    // 5. Tạo OrderDetail
-                    var orderDetails = cart.CartItems.Select(ci => new OrderDetail
-                    {
-                        OrderId = createdOrder.OrderId,
-                        ProductId = ci.ProductId,
-                        Quantity = ci.Quantity,
-                        UnitPrice = ci.UnitPrice,
-                        Discount = 0, // Có thể thêm logic giảm giá
-                        LineTotal = ci.Quantity * ci.UnitPrice
-                    }).ToList();
-
-                    await _orderDetailRepo.Create(orderDetails);
-
-                    // 6. Tạo Invoice
-                    var invoice = new Invoice
-                    {
-                        InvoiceNumber = GenerateInvoiceNumber(),
-                        OrderId = createdOrder.OrderId,
-                        CustomerId = customerId,
-                        CustomerName = cart.Customer?.CustomerName ?? "Unknown",
-                        CustomerAddress = cart.Customer?.Address,
-                        CustomerPhone = cart.Customer?.Phone,
-                        CustomerTaxCode = cart.Customer?.CustomerCode,
-                        IssueDate = DateTime.Now,
-                        DueDate = DateTime.Now.AddDays(30),
-                        SubTotal = salesOrder.TotalAmount ?? 0,
-                        VatRate = 0.1,
-                        VatAmount = salesOrder.TaxAmount ?? 0,
-                        TotalAmount = salesOrder.NetAmount ?? 0,
-                        Status = (int)DataType.InvoiceStatus.Draft,
-                        PaymentStatus = (int)DataType.PaymentStatus.UnPaid
-                    };
-
-                    var createdInvoice = await _invoiceRepo.Create(invoice);
-
-                    // 7. Tạo InvoiceDetail
-                    var invoiceDetails = cart.CartItems.Select(ci => new InvoiceDetail
-                    {
-                        InvoiceId = createdInvoice.InvoiceId,
-                        ProductId = ci.ProductId,
-                        ProductName = ci.Product?.ProductName ?? "Unknown",
-                        ProductCode = ci.Product?.ProductCode ?? "Unknown",
-                        Unit = ci.Product?.Unit,
-                        Quantity = ci.Quantity,
-                        UnitPrice = ci.UnitPrice,
-                        Discount = 0
-                    }).ToList();
-
-                    await _invoiceDetailRepo.Create(invoiceDetails);
-
-                    // 8. Tạo PaymentTransaction
-                    var paymentTransaction = new PaymentTransaction
-                    {
-                        OrderId = createdOrder.OrderId,
-                        PaymentMethodId = paymentMethodId,
-                        TransactionCode = GenerateTransactionCode(),
-                        Amount = salesOrder.NetAmount ?? 0,
-                        TransactionDate = DateTime.Now,
-                        Status = (int)PaymentTransactionStatus.Suscess // Giả sử thanh toán thành công
-                    };
-
-                    await _paymentTransactionRepo.Create(paymentTransaction);
-
-                    // 9. Cập nhật tồn kho
-                    foreach (var item in cart.CartItems)
-                    {
-                        var inventoryQuery = await _inventoryRepo.QueryBy(i => i.ProductId == item.ProductId);
-                        var inventory = await inventoryQuery.FirstOrDefaultAsync();
-                        inventory.Quantity -= item.Quantity;
-                        inventory.UpdatedAt = DateTime.Now;
-                        await _inventoryRepo.Update(inventory);
+                        await transaction.RollbackAsync();
+                        _logger.LogError($"Checkout failed for customer {customerId}", ex);
+                        throw;
                     }
-
-                    // 10. Xóa CartItems
-                    await _cartItemRepo.DeleteRange(ci => ci.CartId == cart.CartId);
-
-                    // 11. Commit transaction
-                    await transaction.CommitAsync();
-                    _logger.LogInformation($"Checkout completed for customer {customerId}. Order ID: {createdOrder.OrderId}");
-
-                    return createdOrder.OrderId;
                 }
-                catch (Exception ex)
-                {
-                    await transaction.RollbackAsync();
-                    _logger.LogError($"Checkout failed for customer {customerId}", ex);
-                    throw;
-                }
-            }
+            });
         }
 
         public async Task<int> CreateOrderAndCheckoutAsync(int customerId, int paymentMethodId, List<int> cartItemIds)
         {
             _logger.LogInformation($"Starting partial checkout for customer {customerId} with payment method {paymentMethodId} and cart items {string.Join(",", cartItemIds)}");
 
-            using (var transaction = await _unitOfWork.Context.Database.BeginTransactionAsync())
+            var executionStrategy = _unitOfWork.Context.Database.CreateExecutionStrategy();
+
+            return await executionStrategy.ExecuteAsync(async () =>
             {
-                try
+                using (var transaction = await _unitOfWork.Context.Database.BeginTransactionAsync())
                 {
-                    // 1. Kiểm tra giỏ hàng và các CartItem được chọn
-                    var cartQuery = await _cartRepo.QueryBy(c => c.CustomerId == customerId);
-                    var cart = await cartQuery
-                        .Include(c => c.CartItems)
-                        .ThenInclude(ci => ci.Product)
-                        .Include(c => c.Customer)
-                        .FirstOrDefaultAsync();
-
-                    if (cart == null)
+                    try
                     {
-                        _logger.LogWarning($"Cart not found for customer {customerId}");
-                        throw new KeyNotFoundException("Giỏ hàng không tồn tại.");
-                    }
+                        // 1. Kiểm tra giỏ hàng và các CartItem được chọn
+                        var cartQuery = await _cartRepo.QueryBy(c => c.CustomerId == customerId);
+                        var cart = await cartQuery
+                            .Include(c => c.CartItems)
+                            .ThenInclude(ci => ci.Product)
+                            .Include(c => c.Customer)
+                            .FirstOrDefaultAsync();
 
-                    var selectedCartItems = cart.CartItems
-                        .Where(ci => cartItemIds.Contains(ci.CartItemId))
-                        .ToList();
-
-                    if (!selectedCartItems.Any())
-                    {
-                        _logger.LogWarning($"No valid cart items selected for customer {customerId}");
-                        throw new InvalidOperationException("Không có sản phẩm nào được chọn để thanh toán.");
-                    }
-
-                    // 2. Kiểm tra phương thức thanh toán
-                    var paymentMethodQuery = await _paymentMethodRepo.QueryBy(pm => pm.PaymentMethodId == paymentMethodId);
-                    var paymentMethod = await paymentMethodQuery.FirstOrDefaultAsync();
-                    if (paymentMethod == null)
-                    {
-                        _logger.LogWarning($"Payment method {paymentMethodId} not found");
-                        throw new InvalidOperationException("Phương thức thanh toán không tồn tại.");
-                    }
-
-                    // 3. Kiểm tra tồn kho
-                    foreach (var item in selectedCartItems)
-                    {
-                        var inventoryQuery = await _inventoryRepo.QueryBy(i => i.ProductId == item.ProductId);
-                        var inventory = await inventoryQuery.FirstOrDefaultAsync();
-                        if (inventory == null || inventory.Quantity < item.Quantity)
+                        if (cart == null)
                         {
-                            _logger.LogWarning($"Insufficient stock for product {item.ProductId}");
-                            throw new InvalidOperationException($"Sản phẩm {item.Product?.ProductName} không đủ tồn kho.");
+                            _logger.LogWarning($"Cart not found for customer {customerId}");
+                            throw new KeyNotFoundException("Giỏ hàng không tồn tại.");
                         }
-                    }
 
-                    // 4. Tạo SalesOrder
-                    var salesOrder = new SalesOrder
-                    {
-                        OrderCode = GenerateOrderCode(),
-                        CustomerId = customerId,
-                        OrderDate = DateTime.Now,
-                        TotalAmount = selectedCartItems.Sum(ci => ci.LineTotal),
-                        DiscountAmount = 0,
-                        TaxAmount = selectedCartItems.Sum(ci => ci.LineTotal) * 0.1,
-                        NetAmount = selectedCartItems.Sum(ci => ci.LineTotal) * 1.1,
-                        Status = (int)SaleStatus.Pending,
-                        PaymentMethodId = paymentMethodId
-                    };
+                        var selectedCartItems = cart.CartItems
+                            .Where(ci => cartItemIds.Contains(ci.CartItemId))
+                            .ToList();
 
-                    var createdOrder = await _salesOrderRepo.Create(salesOrder);
+                        if (!selectedCartItems.Any())
+                        {
+                            _logger.LogWarning($"No valid cart items selected for customer {customerId}");
+                            throw new InvalidOperationException("Không có sản phẩm nào được chọn để thanh toán.");
+                        }
 
-                    // 5. Tạo OrderDetail
-                    var orderDetails = selectedCartItems.Select(ci => new OrderDetail
-                    {
-                        OrderId = createdOrder.OrderId,
-                        ProductId = ci.ProductId,
-                        Quantity = ci.Quantity,
-                        UnitPrice = ci.UnitPrice,
-                        Discount = 0,
-                        LineTotal = ci.Quantity * ci.UnitPrice
-                    }).ToList();
+                        // 2. Kiểm tra phương thức thanh toán
+                        var paymentMethodQuery = await _paymentMethodRepo.QueryBy(pm => pm.PaymentMethodId == paymentMethodId);
+                        var paymentMethod = await paymentMethodQuery.FirstOrDefaultAsync();
+                        if (paymentMethod == null)
+                        {
+                            _logger.LogWarning($"Payment method {paymentMethodId} not found");
+                            throw new InvalidOperationException("Phương thức thanh toán không tồn tại.");
+                        }
 
-                    await _orderDetailRepo.Create(orderDetails);
+                        // 3. Kiểm tra tồn kho
+                        foreach (var item in selectedCartItems)
+                        {
+                            var inventoryList = await (await _inventoryRepo.QueryBy(i => i.ProductId == item.ProductId))
+                                .OrderBy(i => i.UpdatedAt) // FIFO: nhập trước xuất trước
+                                .ToListAsync();
+                            var totalStock = inventoryList.Sum(i => i.Quantity);
+                            if (totalStock < item.Quantity)
+                            {
+                                _logger.LogWarning($"Insufficient stock for product {item.ProductId}");
+                                throw new InvalidOperationException($"Sản phẩm {item.Product?.ProductName} không đủ tồn kho.");
+                            }
+                        }
 
-                    // 6. Tạo PaymentTransaction
-                    var paymentTransaction = new PaymentTransaction
-                    {
-                        OrderId = createdOrder.OrderId,
-                        PaymentMethodId = paymentMethodId,
-                        TransactionCode = GenerateTransactionCode(),
-                        Amount = salesOrder.NetAmount ?? 0,
-                        TransactionDate = DateTime.Now,
-                        Status = (int)SaleStatus.Pending
-                    };
+                        // 4. Tạo SalesOrder
+                        var salesOrder = new SalesOrder
+                        {
+                            OrderCode = GenerateOrderCode(),
+                            CustomerId = customerId,
+                            OrderDate = DateTime.Now,
+                            TotalAmount = selectedCartItems.Sum(ci => ci.LineTotal),
+                            DiscountAmount = 0,
+                            TaxAmount = selectedCartItems.Sum(ci => ci.LineTotal) * 0.1,
+                            NetAmount = selectedCartItems.Sum(ci => ci.LineTotal) * 1.1,
+                            Status = (int)SaleStatus.Pending,
+                            PaymentMethodId = paymentMethodId
+                        };
 
-                    await _paymentTransactionRepo.Create(paymentTransaction);
+                        var createdOrder = await _salesOrderRepo.Create(salesOrder);
 
-                    // 7. Giả lập thanh toán
-                    bool paymentSuccess = await ProcessPayment(paymentTransaction);
+                        // 5. Tạo OrderDetail
+                        var orderDetails = selectedCartItems.Select(ci => new OrderDetail
+                        {
+                            OrderId = createdOrder.OrderId,
+                            ProductId = ci.ProductId,
+                            Quantity = ci.Quantity,
+                            UnitPrice = ci.UnitPrice,
+                            Discount = 0,
+                            LineTotal = ci.Quantity * ci.UnitPrice
+                        }).ToList();
 
-                    if (!paymentSuccess)
-                    {
-                        paymentTransaction.Status = (int)PaymentTransactionStatus.Failed;
-                        salesOrder.Status = (int)SaleStatus.Pending;
+                        await _orderDetailRepo.Create(orderDetails);
+
+                        // 6. Tạo PaymentTransaction
+                        var paymentTransaction = new PaymentTransaction
+                        {
+                            OrderId = createdOrder.OrderId,
+                            PaymentMethodId = paymentMethodId,
+                            TransactionCode = GenerateTransactionCode(),
+                            Amount = salesOrder.NetAmount ?? 0,
+                            TransactionDate = DateTime.Now,
+                            Status = (int)SaleStatus.Pending
+                        };
+
+                        await _paymentTransactionRepo.Create(paymentTransaction);
+
+                        // 7. Giả lập thanh toán
+                        bool paymentSuccess = await ProcessPayment(paymentTransaction);
+
+                        if (!paymentSuccess)
+                        {
+                            paymentTransaction.Status = (int)PaymentTransactionStatus.Failed;
+                            salesOrder.Status = (int)SaleStatus.Pending;
+                            await _paymentTransactionRepo.Update(paymentTransaction);
+                            await _salesOrderRepo.Update(salesOrder);
+                            await transaction.CommitAsync();
+                            _logger.LogWarning($"Payment failed for order {createdOrder.OrderId}");
+                            throw new InvalidOperationException("Thanh toán thất bại.");
+                        }
+
+                        // 8. Cập nhật trạng thái thanh toán thành công
+                        paymentTransaction.Status = (int)PaymentTransactionStatus.Success;
+                        salesOrder.Status = (int)SaleStatus.Completed;
                         await _paymentTransactionRepo.Update(paymentTransaction);
-                        await _salesOrderRepo.Update(salesOrder);
+                        // 9. Tạo Invoice
+                        var invoice = new Invoice
+                        {
+                            InvoiceNumber = GenerateInvoiceNumber(),
+                            OrderId = createdOrder.OrderId,
+                            CustomerId = customerId,
+                            CustomerName = cart.Customer?.CustomerName ?? "Unknown",
+                            CustomerAddress = cart.Customer?.Address,
+                            CustomerPhone = cart.Customer?.Phone,
+                            CustomerTaxCode = cart.Customer?.TaxCode,
+                            IssueDate = DateTime.Now,
+                            DueDate = DateTime.Now.AddDays(30),
+                            SubTotal = salesOrder.TotalAmount ?? 0,
+                            VatRate = 0.1,
+                            VatAmount = salesOrder.TaxAmount ?? 0,
+                            TotalAmount = salesOrder.NetAmount ?? 0,
+                            Status = (int)DataType.InvoiceStatus.Paid,
+                            PaymentStatus = (int)DataType.PaymentStatus.Paid
+                        };
+
+                        var createdInvoice = await _invoiceRepo.Create(invoice);
+
+                        // 10. Tạo InvoiceDetail
+                        var invoiceDetails = selectedCartItems.Select(ci => new InvoiceDetail
+                        {
+                            InvoiceId = createdInvoice.InvoiceId,
+                            ProductId = ci.ProductId,
+                            ProductName = ci.Product?.ProductName ?? "Unknown",
+                            ProductCode = ci.Product?.ProductCode ?? "Unknown",
+                            Unit = ci.Product?.Unit,
+                            Quantity = ci.Quantity,
+                            UnitPrice = ci.UnitPrice,
+                            Discount = 0
+                        }).ToList();
+
+                        await _invoiceDetailRepo.Create(invoiceDetails);
+
+                        // 11. Cập nhật tồn kho
+                        foreach (var item in selectedCartItems)
+                        {
+                            await DeductInventoryFifoAsync(item.ProductId, item.Quantity);
+                        }
+
+                        // 12. Xóa các CartItem được thanh toán
+                        await _cartItemRepo.DeleteRange(ci => cartItemIds.Contains(ci.CartItemId));
+
+                        // 13. Commit transaction
                         await transaction.CommitAsync();
-                        _logger.LogWarning($"Payment failed for order {createdOrder.OrderId}");
-                        throw new InvalidOperationException("Thanh toán thất bại.");
+                        _logger.LogInformation($"Partial checkout completed for customer {customerId}. Order ID: {createdOrder.OrderId}");
+
+                        return createdOrder.OrderId;
                     }
-
-                    // 8. Cập nhật trạng thái thanh toán thành công
-                    paymentTransaction.Status = (int)PaymentTransactionStatus.Suscess;
-                    salesOrder.Status = (int)SaleStatus.refund;
-                    await _paymentTransactionRepo.Update(paymentTransaction);
-                    // 9. Tạo Invoice
-                    var invoice = new Invoice
+                    catch (Exception ex)
                     {
-                        InvoiceNumber = GenerateInvoiceNumber(),
-                        OrderId = createdOrder.OrderId,
-                        CustomerId = customerId,
-                        CustomerName = cart.Customer?.CustomerName ?? "Unknown",
-                        CustomerAddress = cart.Customer?.Address,
-                        CustomerPhone = cart.Customer?.Phone,
-                        CustomerTaxCode = cart.Customer?.CustomerCode,
-                        IssueDate = DateTime.Now,
-                        DueDate = DateTime.Now.AddDays(30),
-                        SubTotal = salesOrder.TotalAmount ?? 0,
-                        VatRate = 0.1,
-                        VatAmount = salesOrder.TaxAmount ?? 0,
-                        TotalAmount = salesOrder.NetAmount ?? 0,
-                        Status = (int)DataType.InvoiceStatus.Paid,
-                        PaymentStatus = (int)DataType.PaymentStatus.Paid
-                    };
-
-                    var createdInvoice = await _invoiceRepo.Create(invoice);
-
-                    // 10. Tạo InvoiceDetail
-                    var invoiceDetails = selectedCartItems.Select(ci => new InvoiceDetail
-                    {
-                        InvoiceId = createdInvoice.InvoiceId,
-                        ProductId = ci.ProductId,
-                        ProductName = ci.Product?.ProductName ?? "Unknown",
-                        ProductCode = ci.Product?.ProductCode ?? "Unknown",
-                        Unit = ci.Product?.Unit,
-                        Quantity = ci.Quantity,
-                        UnitPrice = ci.UnitPrice,
-                        Discount = 0
-                    }).ToList();
-
-                    await _invoiceDetailRepo.Create(invoiceDetails);
-
-                    // 11. Cập nhật tồn kho
-                    foreach (var item in selectedCartItems)
-                    {
-                        var inventoryQuery = await _inventoryRepo.QueryBy(i => i.ProductId == item.ProductId);
-                        var inventory = await inventoryQuery.FirstOrDefaultAsync();
-                        inventory.Quantity -= item.Quantity;
-                        inventory.UpdatedAt = DateTime.Now;
-                        await _inventoryRepo.Update(inventory);
+                        await transaction.RollbackAsync();
+                        _logger.LogError($"Partial checkout failed for customer {customerId}", ex);
+                        throw;
                     }
-
-                    // 12. Xóa các CartItem được thanh toán
-                    await _cartItemRepo.DeleteRange(ci => cartItemIds.Contains(ci.CartItemId));
-
-                    // 13. Commit transaction
-                    await transaction.CommitAsync();
-                    _logger.LogInformation($"Partial checkout completed for customer {customerId}. Order ID: {createdOrder.OrderId}");
-
-                    return createdOrder.OrderId;
                 }
-                catch (Exception ex)
-                {
-                    await transaction.RollbackAsync();
-                    _logger.LogError($"Partial checkout failed for customer {customerId}", ex);
-                    throw;
-                }
-            }
+            });
         }
 
         /// <summary>
@@ -416,175 +422,180 @@ namespace PipeVolt_BLL.Services
         {
             _logger.LogInformation($"Starting POS checkout with {items?.Count ?? 0} items, payment method {paymentMethodId}");
 
-            using (var transaction = await _unitOfWork.Context.Database.BeginTransactionAsync())
+            var executionStrategy = _unitOfWork.Context.Database.CreateExecutionStrategy();
+
+            return await executionStrategy.ExecuteAsync(async () =>
             {
-                try
+                using (var transaction = await _unitOfWork.Context.Database.BeginTransactionAsync())
                 {
-                    // 1. Validate input
-                    if (items == null || !items.Any())
+                    try
                     {
-                        throw new InvalidOperationException("Danh sách sản phẩm không được trống.");
-                    }
-
-                    // 2. Kiểm tra phương thức thanh toán
-                    var paymentMethodQuery = await _paymentMethodRepo.QueryBy(pm => pm.PaymentMethodId == paymentMethodId);
-                    var paymentMethod = await paymentMethodQuery.FirstOrDefaultAsync();
-                    if (paymentMethod == null)
-                    {
-                        throw new InvalidOperationException("Phương thức thanh toán không tồn tại.");
-                    }
-
-                    // 3. Load và validate products
-                    var productIds = items.Select(i => i.ProductId).ToList();
-                    var productsQuery = await _productRepo.QueryBy(p => productIds.Contains(p.ProductId));
-                    var products = await productsQuery.ToListAsync();
-
-                    if (products.Count != productIds.Count)
-                    {
-                        throw new InvalidOperationException("Một số sản phẩm không tồn tại trong hệ thống.");
-                    }
-                    // Validate cashier if provided
-                    if (cashierId.HasValue)
-                    {
-                        var employeeQuery = await _employeeRepo.QueryBy(e => e.EmployeeId == cashierId.Value);
-                        var employee = await employeeQuery.FirstOrDefaultAsync();
-                        if (employee == null)
+                        // 1. Validate input
+                        if (items == null || !items.Any())
                         {
-                            throw new InvalidOperationException("Nhân viên thu ngân không tồn tại.");
-                        }
-                    }
-                    // 4. Kiểm tra tồn kho và validate prices
-                    var validatedItems = new List<(PosItem item, Product product, Inventory inventory)>();
-
-                    foreach (var item in items)
-                    {
-                        var product = products.First(p => p.ProductId == item.ProductId);
-
-                        var inventoryQuery = await _inventoryRepo.QueryBy(i => i.ProductId == item.ProductId);
-                        var inventory = await inventoryQuery.FirstOrDefaultAsync();
-
-                        if (inventory == null || inventory.Quantity < item.Quantity)
-                        {
-                            throw new InvalidOperationException($"Sản phẩm {product.ProductName} không đủ tồn kho. Có sẵn: {inventory?.Quantity ?? 0}, yêu cầu: {item.Quantity}");
+                            throw new InvalidOperationException("Danh sách sản phẩm không được trống.");
                         }
 
-                        // Validate unit price
-                        if (item.UnitPrice <= 0)
+                        // 2. Kiểm tra phương thức thanh toán
+                        var paymentMethodQuery = await _paymentMethodRepo.QueryBy(pm => pm.PaymentMethodId == paymentMethodId);
+                        var paymentMethod = await paymentMethodQuery.FirstOrDefaultAsync();
+                        if (paymentMethod == null)
                         {
-                            throw new InvalidOperationException($"Giá sản phẩm {product.ProductName} không hợp lệ.");
+                            throw new InvalidOperationException("Phương thức thanh toán không tồn tại.");
                         }
 
-                        validatedItems.Add((item, product, inventory));
+                        // 3. Load và validate products
+                        var productIds = items.Select(i => i.ProductId).ToList();
+                        var productsQuery = await _productRepo.QueryBy(p => productIds.Contains(p.ProductId));
+                        var products = await productsQuery.ToListAsync();
+
+                        if (products.Count != productIds.Count)
+                        {
+                            throw new InvalidOperationException("Một số sản phẩm không tồn tại trong hệ thống.");
+                        }
+                        // Validate cashier if provided
+                        if (cashierId.HasValue)
+                        {
+                            var employeeQuery = await _employeeRepo.QueryBy(e => e.EmployeeId == cashierId.Value);
+                            var employee = await employeeQuery.FirstOrDefaultAsync();
+                            if (employee == null)
+                            {
+                                throw new InvalidOperationException("Nhân viên thu ngân không tồn tại.");
+                            }
+                        }
+                        // 4. Kiểm tra tồn kho và validate prices
+                        var validatedItems = new List<(PosItem item, Product product)>();
+
+                        foreach (var item in items)
+                        {
+                            var product = products.First(p => p.ProductId == item.ProductId);
+
+                            var inventoryList = await (await _inventoryRepo.QueryBy(i => i.ProductId == item.ProductId))
+                                .OrderBy(i => i.UpdatedAt)
+                                .ToListAsync();
+                            var totalStock = inventoryList.Sum(i => i.Quantity);
+
+                            if (totalStock < item.Quantity)
+                            {
+                                throw new InvalidOperationException($"Sản phẩm {product.ProductName} không đủ tồn kho. Có sẵn: {totalStock}, yêu cầu: {item.Quantity}");
+                            }
+
+                            // Validate unit price
+                            if (item.UnitPrice <= 0)
+                            {
+                                throw new InvalidOperationException($"Giá sản phẩm {product.ProductName} không hợp lệ.");
+                            }
+
+                            validatedItems.Add((item, product));
+                        }
+
+                        // 5. Tính toán số tiền
+                        var subtotal = validatedItems.Sum(vi => (decimal)vi.item.Quantity * (decimal)vi.item.UnitPrice - (decimal)vi.item.Discount);
+                        var orderDiscountAmount = subtotal * discountPercent / 100;
+                        var totalAmountAfterDiscount = subtotal - orderDiscountAmount;
+                        var taxAmount = totalAmountAfterDiscount * 0.1m; // 10% VAT
+                        var netAmount = totalAmountAfterDiscount + taxAmount;
+
+                        // 6. Tạo SalesOrder
+                        var salesOrder = new SalesOrder
+                        {
+                            OrderCode = GenerateOrderCode("POS"),
+                            CustomerId = customerInfo?.CustomerId,
+                            EmployeeId = cashierId, 
+                            OrderDate = DateTime.Now,
+                            TotalAmount = (double)subtotal,
+                            DiscountAmount = (double)orderDiscountAmount,
+                            TaxAmount = (double)taxAmount,
+                            NetAmount = (double)netAmount,
+                            Status = (int)SaleStatus.Completed,
+                            PaymentMethodId = paymentMethodId,
+                        };
+
+                        var createdOrder = await _salesOrderRepo.Create(salesOrder);
+
+                        // 7. Tạo OrderDetail
+                        var orderDetails = validatedItems.Select(vi => new OrderDetail
+                        {
+                            OrderId = createdOrder.OrderId,
+                            ProductId = vi.item.ProductId,
+                            Quantity = vi.item.Quantity,
+                            UnitPrice = (double)vi.item.UnitPrice,
+                            Discount = (double)vi.item.Discount,
+                            LineTotal = (double?)(vi.item.Quantity * vi.item.UnitPrice - vi.item.Discount)
+                        }).ToList();
+
+                        await _orderDetailRepo.Create(orderDetails);
+
+                        // 8. Tạo Invoice (hóa đơn bán hàng)
+                        var invoice = new Invoice
+                        {
+                            InvoiceNumber = GenerateInvoiceNumber("POS"),
+                            OrderId = createdOrder.OrderId,
+                            CustomerId = customerInfo?.CustomerId,
+                            CustomerName = customerInfo?.CustomerName ?? "Khách lẻ",
+                            CustomerAddress = customerInfo?.CustomerAddress,
+                            CustomerPhone = customerInfo?.CustomerPhone,
+                            CustomerTaxCode = customerInfo?.CustomerTaxCode,
+                            IssueDate = DateTime.Now,
+                            DueDate = DateTime.Now, // POS payment is immediate
+                            SubTotal = (double)subtotal,
+                            VatRate = 0.1,
+                            VatAmount = (double)taxAmount,
+                            TotalAmount = (double)netAmount,
+                            Status = (int)DataType.InvoiceStatus.Paid,
+                            PaymentStatus = (int)DataType.PaymentStatus.Paid
+                        };
+
+                        var createdInvoice = await _invoiceRepo.Create(invoice);
+
+                        // 9. Tạo InvoiceDetail
+                        var invoiceDetails = validatedItems.Select(vi => new InvoiceDetail
+                        {
+                            InvoiceId = createdInvoice.InvoiceId,
+                            ProductId = vi.item.ProductId,
+                            ProductName = vi.product.ProductName,
+                            ProductCode = vi.product.ProductCode,
+                            Unit = vi.product.Unit,
+                            Quantity = vi.item.Quantity,
+                            UnitPrice = (double)vi.item.UnitPrice,
+                            Discount = (double)vi.item.Discount
+                        }).ToList();
+
+                        await _invoiceDetailRepo.Create(invoiceDetails);
+
+                        // 10. Tạo PaymentTransaction
+                        var paymentTransaction = new PaymentTransaction
+                        {
+                            OrderId = createdOrder.OrderId,
+                            PaymentMethodId = paymentMethodId,
+                            TransactionCode = GenerateTransactionCode("POS"),
+                            Amount = (double)netAmount,
+                            TransactionDate = DateTime.Now,
+                            Status = (int)PaymentTransactionStatus.Success // POS payment is immediate
+                        };
+
+                        await _paymentTransactionRepo.Create(paymentTransaction);
+
+                        // 11. Cập nhật tồn kho
+                        foreach (var (item, product) in validatedItems)
+                        {
+                            await DeductInventoryFifoAsync(item.ProductId, item.Quantity);
+                        }
+
+                        // 12. Commit transaction
+                        await transaction.CommitAsync();
+                        _logger.LogInformation($"POS checkout completed. Order ID: {createdOrder.OrderId}, Amount: {netAmount}");
+
+                        return createdOrder.OrderId;
                     }
-
-                    // 5. Tính toán số tiền
-                    var subtotal = validatedItems.Sum(vi => (decimal)vi.item.Quantity * (decimal)vi.item.UnitPrice - (decimal)vi.item.Discount);
-                    var orderDiscountAmount = subtotal * discountPercent / 100;
-                    var totalAmountAfterDiscount = subtotal - orderDiscountAmount;
-                    var taxAmount = totalAmountAfterDiscount * 0.1m; // 10% VAT
-                    var netAmount = totalAmountAfterDiscount + taxAmount;
-
-                    // 6. Tạo SalesOrder
-                    var salesOrder = new SalesOrder
+                    catch (Exception ex)
                     {
-                        OrderCode = GenerateOrderCode("POS"),
-                        CustomerId = customerInfo?.CustomerId ?? 0,
-                        EmployeeId = cashierId, 
-                        OrderDate = DateTime.Now,
-                        TotalAmount = (double)subtotal,
-                        DiscountAmount = (double)orderDiscountAmount,
-                        TaxAmount = (double)taxAmount,
-                        NetAmount = (double)netAmount,
-                        Status = (int)SaleStatus.Completed,
-                        PaymentMethodId = paymentMethodId,
-                    };
-
-                    var createdOrder = await _salesOrderRepo.Create(salesOrder);
-
-                    // 7. Tạo OrderDetail
-                    var orderDetails = validatedItems.Select(vi => new OrderDetail
-                    {
-                        OrderId = createdOrder.OrderId,
-                        ProductId = vi.item.ProductId,
-                        Quantity = vi.item.Quantity,
-                        UnitPrice = (double)vi.item.UnitPrice,
-                        Discount = (double)vi.item.Discount,
-                        LineTotal = (double?)(vi.item.Quantity * vi.item.UnitPrice - vi.item.Discount)
-                    }).ToList();
-
-                    await _orderDetailRepo.Create(orderDetails);
-
-                    // 8. Tạo Invoice (hóa đơn bán hàng)
-                    var invoice = new Invoice
-                    {
-                        InvoiceNumber = GenerateInvoiceNumber("POS"),
-                        OrderId = createdOrder.OrderId,
-                        CustomerId = customerInfo?.CustomerId ?? 0,
-                        CustomerName = customerInfo?.CustomerName ?? "Khách lẻ",
-                        CustomerAddress = customerInfo?.CustomerAddress,
-                        CustomerPhone = customerInfo?.CustomerPhone,
-                        CustomerTaxCode = customerInfo?.CustomerTaxCode,
-                        IssueDate = DateTime.Now,
-                        DueDate = DateTime.Now, // POS payment is immediate
-                        SubTotal = (double)subtotal,
-                        VatRate = 0.1,
-                        VatAmount = (double)taxAmount,
-                        TotalAmount = (double)netAmount,
-                        Status = (int)DataType.InvoiceStatus.Paid,
-                        PaymentStatus = (int)DataType.PaymentStatus.Paid
-                    };
-
-                    var createdInvoice = await _invoiceRepo.Create(invoice);
-
-                    // 9. Tạo InvoiceDetail
-                    var invoiceDetails = validatedItems.Select(vi => new InvoiceDetail
-                    {
-                        InvoiceId = createdInvoice.InvoiceId,
-                        ProductId = vi.item.ProductId,
-                        ProductName = vi.product.ProductName,
-                        ProductCode = vi.product.ProductCode,
-                        Unit = vi.product.Unit,
-                        Quantity = vi.item.Quantity,
-                        UnitPrice = (double)vi.item.UnitPrice,
-                        Discount = (double)vi.item.Discount
-                    }).ToList();
-
-                    await _invoiceDetailRepo.Create(invoiceDetails);
-
-                    // 10. Tạo PaymentTransaction
-                    var paymentTransaction = new PaymentTransaction
-                    {
-                        OrderId = createdOrder.OrderId,
-                        PaymentMethodId = paymentMethodId,
-                        TransactionCode = GenerateTransactionCode("POS"),
-                        Amount = (double)netAmount,
-                        TransactionDate = DateTime.Now,
-                        Status = (int)PaymentTransactionStatus.Suscess // POS payment is immediate
-                    };
-
-                    await _paymentTransactionRepo.Create(paymentTransaction);
-
-                    // 11. Cập nhật tồn kho
-                    foreach (var (item, product, inventory) in validatedItems)
-                    {
-                        inventory.Quantity -= item.Quantity;
-                        inventory.UpdatedAt = DateTime.Now;
-                        await _inventoryRepo.Update(inventory);
+                        await transaction.RollbackAsync();
+                        _logger.LogError($"POS checkout failed", ex);
+                        throw;
                     }
-
-                    // 12. Commit transaction
-                    await transaction.CommitAsync();
-                    _logger.LogInformation($"POS checkout completed. Order ID: {createdOrder.OrderId}, Amount: {netAmount}");
-
-                    return createdOrder.OrderId;
                 }
-                catch (Exception ex)
-                {
-                    await transaction.RollbackAsync();
-                    _logger.LogError($"POS checkout failed", ex);
-                    throw;
-                }
-            }
+            });
         }
 
         // Giả lập xử lý thanh toán
@@ -627,6 +638,29 @@ namespace PipeVolt_BLL.Services
         {
             var code = $"TXN-{DateTime.Now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString().Substring(0, 8)}";
             return string.IsNullOrWhiteSpace(prefix) ? code : $"{prefix}-{code}";
+        }
+
+        private async Task DeductInventoryFifoAsync(int productId, int quantityNeeded)
+        {
+            var inventoryList = await (await _inventoryRepo.QueryBy(i => i.ProductId == productId))
+                .OrderBy(i => i.UpdatedAt) // FIFO
+                .ToListAsync();
+
+            int remaining = quantityNeeded;
+            foreach (var inv in inventoryList)
+            {
+                if (remaining <= 0) break;
+                if (inv.Quantity <= 0) continue;
+
+                int deduct = Math.Min(inv.Quantity, remaining);
+                inv.Quantity -= deduct;
+                inv.UpdatedAt = DateTime.Now;
+                await _inventoryRepo.Update(inv);
+                remaining -= deduct;
+            }
+
+            if (remaining > 0)
+                throw new InvalidOperationException($"Không đủ tồn kho để xuất (còn thiếu {remaining}).");
         }
 
     }

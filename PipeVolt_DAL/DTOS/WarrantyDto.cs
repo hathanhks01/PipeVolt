@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -13,6 +13,7 @@ namespace PipeVolt_DAL.DTOS
         public int WarrantyId { get; set; }
         public int ProductId { get; set; }
         public int CustomerId { get; set; }
+        public int? OrderId { get; set; }
         public string? SerialNumber { get; set; }
         public DateOnly? StartDate { get; set; }
         public DateOnly? EndDate { get; set; }
@@ -23,6 +24,7 @@ namespace PipeVolt_DAL.DTOS
     {
         [Required] public int ProductId { get; set; }
         [Required] public int CustomerId { get; set; }
+        public int? OrderId { get; set; }
         public string? SerialNumber { get; set; }
         public DateOnly? StartDate { get; set; }
         public DateOnly? EndDate { get; set; }
@@ -34,6 +36,7 @@ namespace PipeVolt_DAL.DTOS
         [Required] public int WarrantyId { get; set; }
         [Required] public int ProductId { get; set; }
         [Required] public int CustomerId { get; set; }
+        public int? OrderId { get; set; }
         public string? SerialNumber { get; set; }
         public DateOnly? StartDate { get; set; }
         public DateOnly? EndDate { get; set; }

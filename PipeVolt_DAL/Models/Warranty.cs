@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -34,6 +34,12 @@ public partial class Warranty
 
     [Column("notes")]
     public string? Notes { get; set; }
+
+    [Column("order_id")]
+    public int? OrderId { get; set; }
+
+    [ForeignKey("OrderId")]
+    public virtual SalesOrder? Order { get; set; }
 
     [ForeignKey("CustomerId")]
     [InverseProperty("Warranties")]

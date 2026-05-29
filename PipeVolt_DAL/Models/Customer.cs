@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -33,6 +33,10 @@ public partial class Customer
     [Column("email")]
     [StringLength(100)]
     public string? Email { get; set; }
+
+    [Column("tax_code")]
+    [StringLength(20)]
+    public string? TaxCode { get; set; }
 
     [Column("registration_date")]
     public DateOnly? RegistrationDate { get; set; }

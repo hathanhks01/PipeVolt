@@ -1,10 +1,12 @@
 ﻿using AutoMapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using PipeVolt_Api.Common;
 using PipeVolt_Api.Common.Repository;
 using PipeVolt_BLL.IServices;
+using PipeVolt_DAL.Common.Repository;
 using PipeVolt_DAL.DTOS;
 using PipeVolt_DAL.Models;
 using System;
@@ -20,17 +22,22 @@ namespace PipeVolt_BLL.Services
         private readonly IGenericRepository<ProductCategory> _categoryRepo;
         private readonly IMapper _mapper;
         private readonly ILoggerService _logger;
-
+        private readonly IMemoryCache _cache;
+        private readonly ICacheService _cacheService;
         public ProductService(
             IGenericRepository<Product> repo,
             IGenericRepository<ProductCategory> categoryRepo,
             IMapper mapper,
-            ILoggerService logger)
+            ILoggerService logger,
+            IMemoryCache cache,
+            ICacheService cacheService)
         {
             _repo = repo;
             _categoryRepo = categoryRepo ?? throw new ArgumentNullException(nameof(categoryRepo));
             _mapper = mapper;
             _logger = logger;
+            _cacheService = cacheService;
+            _cache = cache;
         }
 
         public async Task<ProductDto> GetProductByIdAsync(int productId)
@@ -115,42 +122,48 @@ namespace PipeVolt_BLL.Services
         }
         public async Task<IEnumerable<ProductDto>> GetAllProductsAsync()
         {
-           
-                try
+            return await _cacheService.GetOrSetAsync(
+                CacheKeys.AllProducts,
+                async () =>
                 {
-                    var sql = @"
-            SELECT 
-                p.product_id,
-                p.product_code,
-                p.product_name,
-                p.category_id,
-                p.brand_id,
-                p.selling_price,
-                p.unit,
-                p.description,
-                p.image_url,
-                ISNULL(SUM(i.quantity), 0) AS quantity
-            FROM PRODUCT p
-            LEFT JOIN INVENTORY i ON p.product_id = i.product_id
-            GROUP BY 
-                p.product_id,
-                p.product_code,
-                p.product_name,
-                p.category_id,
-                p.brand_id,
-                p.selling_price,
-                p.unit,
-                p.description,
-                p.image_url";
+                    try
+                    {
+                        var sql = @"
+                SELECT 
+                    p.product_id,
+                    p.product_code,
+                    p.product_name,
+                    p.category_id,
+                    p.brand_id,
+                    p.selling_price,
+                    p.unit,
+                    p.description,
+                    p.image_url,
+                    ISNULL(SUM(i.quantity), 0) AS quantity
+                FROM PRODUCT p
+                LEFT JOIN INVENTORY i ON p.product_id = i.product_id
+                GROUP BY 
+                    p.product_id,
+                    p.product_code,
+                    p.product_name,
+                    p.category_id,
+                    p.brand_id,
+                    p.selling_price,
+                    p.unit,
+                    p.description,
+                    p.image_url";
 
-                    var product = await _repo.SqlQuery<Product>(sql);
-                return _mapper.Map<IEnumerable<ProductDto>>(product);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError("Error in GetAllProductsAsync", ex);
-                    throw;
-                }
+                        var products = await _repo.SqlQuery<Product>(sql);
+                        return _mapper.Map<IEnumerable<ProductDto>>(products);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError("Error in GetAllProductsAsync (cache factory)", ex);
+                        return Enumerable.Empty<ProductDto>();
+                    }
+                },
+                TimeSpan.FromMinutes(30)
+            );
         }
         public async Task<IEnumerable<ProductDto>> GetPopularProductsAsync()
         {
@@ -188,6 +201,7 @@ namespace PipeVolt_BLL.Services
                 }
 
                 var created = await _repo.Create(entity);
+                _cacheService.Remove(CacheKeys.AllProducts);
                 return _mapper.Map<ProductDto>(created);
             }
             catch (Exception ex)
@@ -223,6 +237,7 @@ namespace PipeVolt_BLL.Services
                 }
 
                 await _repo.Update(entity);
+                _cacheService.Remove(CacheKeys.AllProducts);
                 return _mapper.Map<ProductDto>(entity);
             }
             catch (Exception ex)
@@ -255,11 +270,11 @@ namespace PipeVolt_BLL.Services
                     catch (Exception ex)
                     {
                         _logger.LogError("Error deleting product image file", ex);
-                        // Có thể không throw để vẫn cho phép xóa Product nếu chỉ xóa ảnh lỗi
                     }
                 }
 
                 await _repo.Delete(entity);
+                _cacheService.Remove(CacheKeys.AllProducts);
                 return true;
             }
             catch (Exception ex)

@@ -10,6 +10,6 @@ namespace PipeVolt_BLL.IServices
         Task<List<InventoryDto>> GetAllInventoriesAsync();
         Task<InventoryDto> GetInventoryByIdAsync(int id);
         Task<InventoryDto> UpdateInventoryAsync(int id, UpdateInventoryDto dto);
-        Task<bool> ReceiveFromPurchaseOrderAsync(string warehouseCode, int purchaseOrderId);
+        Task<bool> ReceiveFromPurchaseOrderAsync(string warehouseCode, string purchaseOrderId);
     }
 }

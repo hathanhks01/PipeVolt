@@ -12,7 +12,7 @@ namespace PipeVolt_DAL.Models
     public partial class Cart
     {
         [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.None)]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
         [Column("cart_id")]
         public int CartId { get; set; }
 

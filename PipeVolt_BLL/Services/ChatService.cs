@@ -108,7 +108,7 @@ namespace PipeVolt_BLL.Services
                 var result = new List<ChatRoomDto>();
                 foreach (var room in rooms)
                 {
-                    result.Add(await MapToChatRoomDto(room));
+                    result.Add(await MapToChatRoomDto(room, customerId, (int)UserType.Customer));
                 }
 
                 return result;
@@ -138,7 +138,7 @@ namespace PipeVolt_BLL.Services
                 var result = new List<ChatRoomDto>();
                 foreach (var room in rooms)
                 {
-                    result.Add(await MapToChatRoomDto(room));
+                    result.Add(await MapToChatRoomDto(room, employeeId, (int)UserType.Employee));
                 }
 
                 return result;
@@ -146,6 +146,33 @@ namespace PipeVolt_BLL.Services
             catch (Exception ex)
             {
                 _logger.LogError("[GetChatRoomsForEmployeeAsync] Error fetching chat rooms", ex);
+                throw;
+            }
+        }
+
+        public async Task<ChatRoomDto> GetChatRoomByIdAsync(int chatRoomId)
+        {
+            _logger.LogInformation($"[GetChatRoomByIdAsync] Fetching chat room {chatRoomId}");
+            try
+            {
+                var room = await _context.ChatRooms
+                    .Include(r => r.Customer)
+                    .Include(r => r.Employee)
+                    .Include(r => r.ChatMessages)
+                    .FirstOrDefaultAsync(r => r.ChatRoomId == chatRoomId);
+
+                if (room == null)
+                {
+                    _logger.LogWarning($"[GetChatRoomByIdAsync] Chat room {chatRoomId} not found");
+                    return null;
+                }
+
+                _logger.LogInformation($"[GetChatRoomByIdAsync] Found chat room {chatRoomId}");
+                return await MapToChatRoomDto(room);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("[GetChatRoomByIdAsync] Error fetching chat room", ex);
                 throw;
             }
         }
@@ -184,6 +211,15 @@ namespace PipeVolt_BLL.Services
             _logger.LogInformation($"[SendMessageAsync] Sending message to chatRoomId {messageDto.ChatRoomId} by sender {messageDto.SenderId} (type {messageDto.SenderType})");
             try
             {
+                // Check if room is closed and reopen if customer sends message
+                var chatRoom = await _context.ChatRooms.FindAsync(messageDto.ChatRoomId);
+                if (chatRoom != null && chatRoom.Status == 1 && messageDto.SenderType == (int)UserType.Customer)
+                {
+                    _logger.LogInformation($"[SendMessageAsync] Reopening closed chatRoom {messageDto.ChatRoomId}");
+                    chatRoom.Status = 0; // Reopen room
+                    chatRoom.UpdatedAt = DateTime.Now;
+                }
+
                 var message = new ChatMessage
                 {
                     ChatRoomId = messageDto.ChatRoomId,
@@ -197,7 +233,6 @@ namespace PipeVolt_BLL.Services
                 _context.ChatMessages.Add(message);
 
                 // Cập nhật thời gian tin nhắn cuối cùng của phòng chat
-                var chatRoom = await _context.ChatRooms.FindAsync(messageDto.ChatRoomId);
                 if (chatRoom != null)
                 {
                     chatRoom.LastMessageAt = DateTime.Now;
@@ -431,6 +466,40 @@ namespace PipeVolt_BLL.Services
                 IsRead = message.IsRead,
                 SentAt = message.SentAt,
                 ReadAt = message.ReadAt
+            };
+        }
+
+        // Overloaded method for user-specific unread count
+        private async Task<ChatRoomDto> MapToChatRoomDto(ChatRoom room, int userId, int userType)
+        {
+            var customer = await _context.Customers.FindAsync(room.CustomerId);
+            var employee = room.EmployeeId.HasValue ?
+                await _context.Employees.FindAsync(room.EmployeeId.Value) : null;
+
+            var lastMessage = await _context.ChatMessages
+                .Where(m => m.ChatRoomId == room.ChatRoomId)
+                .OrderByDescending(m => m.SentAt)
+                .FirstOrDefaultAsync();
+
+            // Unread count excludes messages sent by the current user
+            var unreadCount = await _context.ChatMessages
+                .CountAsync(m => m.ChatRoomId == room.ChatRoomId && 
+                           !m.IsRead && 
+                           !(m.SenderId == userId && m.SenderType == userType));
+
+            return new ChatRoomDto
+            {
+                ChatRoomId = room.ChatRoomId,
+                CustomerId = room.CustomerId,
+                CustomerName = customer?.CustomerName ?? "Unknown",
+                EmployeeId = room.EmployeeId,
+                EmployeeName = employee?.EmployeeName,
+                RoomName = room.RoomName,
+                Status = room.Status,
+                CreatedAt = room.CreatedAt,
+                LastMessageAt = room.LastMessageAt,
+                LastMessage = lastMessage?.MessageContent,
+                UnreadCount = unreadCount
             };
         }
     }

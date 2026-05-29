@@ -8,6 +8,7 @@ namespace PipeVolt_BLL.IServices
         Task<bool> CloseChatRoomAsync(int chatRoomId);
         Task<ChatRoomDto> CreateChatRoomAsync(CreateChatRoomDto createDto);
         Task<List<ChatRoomDto>> GetAllChatRoomsAsync();
+        Task<ChatRoomDto> GetChatRoomByIdAsync(int chatRoomId);
         Task<List<ChatMessageDto>> GetChatMessagesAsync(int chatRoomId, int page = 1, int pageSize = 50);
         Task<List<ChatRoomDto>> GetChatRoomsForCustomerAsync(int customerId);
         Task<List<ChatRoomDto>> GetChatRoomsForEmployeeAsync(int employeeId);

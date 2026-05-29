@@ -78,11 +78,6 @@ public class AutoMapperProfiles : Profile
             .ForMember(dest => dest.SupplierId, opt => opt.Ignore());
         CreateMap<UpdateSupplierDto, Supplier>();
 
-        // Supply
-        CreateMap<Supply, SupplyDto>();
-        CreateMap<CreateSupplyDto, Supply>()
-            .ForMember(dest => dest.SupplyId, opt => opt.Ignore());
-        CreateMap<UpdateSupplyDto, Supply>();
 
         // Warehouse
         CreateMap<Warehouse, WarehouseDto>();

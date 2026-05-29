@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using PipeVolt_Api.Common.Repository;
@@ -15,23 +15,34 @@ using Microsoft.AspNetCore.Authentication.Google;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+var conn = builder.Configuration.GetConnectionString("DefaultConnection");
+Console.WriteLine("DB = " + conn);
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<PipeVoltDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowReactApp", policy =>
-    {
-        policy.WithOrigins("http://localhost:3000", "http://localhost:5173")
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials();
-    });
-});
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqlOptions => sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(10),
+            errorNumbersToAdd: null
+        )
+    ));
+//builder.Services.AddDbContext<PipeVoltDbContext>(options =>
+//    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+//builder.Services.AddCors(options =>
+//{
+//    options.AddPolicy("AllowReactApp", policy =>
+//    {
+//        policy.WithOrigins("http://localhost:3000", "http://localhost:5173")
+//              .AllowAnyMethod()
+//              .AllowAnyHeader()
+//              .AllowCredentials();
+//    });
+//});
 
 
 builder.Services.AddDistributedMemoryCache(); // Lưu trữ session trong bộ nhớ
@@ -50,6 +61,16 @@ builder.Services.AddSignalR(options =>
     options.StreamBufferCapacity = 10;
     options.ClientTimeoutInterval = TimeSpan.FromSeconds(60);
     options.KeepAliveInterval = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp", policy =>
+        policy
+            .AllowAnyOrigin() // 🔥 test
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            
+    );
 });
 // Repositories
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -75,7 +96,6 @@ builder.Services.AddScoped<IGenericRepository<PurchaseOrder>, PurchaseOrderRepos
 builder.Services.AddScoped<IGenericRepository<PurchaseOrderDetail>, PurchaseOrderDetailRepository>();
 builder.Services.AddScoped<IGenericRepository<SalesOrder>, SalesOrderRepository>();
 builder.Services.AddScoped<IGenericRepository<Supplier>, SupplierRepository>();
-builder.Services.AddScoped<IGenericRepository<Supply>, SupplyRepository>();
 builder.Services.AddScoped<IGenericRepository<Warehouse>, WarehouseRepository>();
 builder.Services.AddScoped<IGenericRepository<Warranty>, WarrantyRepository>();
 builder.Services.AddScoped<IGenericRepository<Cart>, CartRepository>();
@@ -93,7 +113,6 @@ builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
 builder.Services.AddScoped<IPurchaseOrderDetailService, PurchaseOrderDetailService>();
 builder.Services.AddScoped<ISalesOrderService, SalesOrderService>();
 builder.Services.AddScoped<ISupplierService, SupplierService>();
-builder.Services.AddScoped<ISupplyService, SupplyService>();
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
 builder.Services.AddScoped<IWarrantyService, WarrantyService>();
 builder.Services.AddScoped<ICartItemService, CartItemService>();
@@ -103,6 +122,7 @@ builder.Services.AddScoped<ICheckoutService,CheckoutService>();
 builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<IAIChatbotService, AIChatbotService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<ICacheService, CacheService>();
 // Logger
 builder.Services.AddScoped<ILoggerService, LoggerService>();
 // Đăng ký JWT và Policy Authorization
@@ -114,12 +134,12 @@ builder.Services.AddAuthorizationPolicies();
 builder.Services.AddHttpClient();
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
+//// Configure the HTTP request pipeline.
+//if (app.Environment.IsDevelopment())
+//{
     app.UseSwagger();
     app.UseSwaggerUI();
-}
+//}
 
 app.UseCors("AllowReactApp");
 app.MapHub<ChatHub>("/chathub");

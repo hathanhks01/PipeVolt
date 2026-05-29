@@ -110,6 +110,20 @@ namespace PipeVolt_Api.Controllers
                 await _hubContext.Clients.Group($"ChatRoom_{messageDto.ChatRoomId}")
                     .SendAsync("ReceiveMessage", result);
 
+                // Notify admin chat list if customer sends message
+                if (messageDto.SenderType == 2) // Customer
+                {
+                    var room = await _chatService.GetChatRoomByIdAsync(messageDto.ChatRoomId);
+                    if (room?.EmployeeId.HasValue == true)
+                    {
+                        await _hubContext.Clients.Group($"AdminChatList_{room.EmployeeId}")
+                            .SendAsync("ChatListUpdated", messageDto.ChatRoomId);
+                    }
+                    // Also notify all employees for unassigned rooms
+                    await _hubContext.Clients.Group("AdminChatListAll")
+                        .SendAsync("ChatListUpdated", messageDto.ChatRoomId);
+                }
+
                 return Ok(result);
             }
             catch (Exception ex)

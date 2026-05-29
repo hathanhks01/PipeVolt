@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -27,6 +27,8 @@ namespace PipeVolt_DAL.DTOS
         [StringLength(200, ErrorMessage = "Address can't be longer than 200 characters")]
         public string? Address { get; set; }
 
+        public string? TaxCode { get; set; }
+
         public DateOnly RegistrationDate { get; set; }
     }
 
@@ -48,6 +50,8 @@ namespace PipeVolt_DAL.DTOS
 
         [StringLength(200, ErrorMessage = "Address can't be longer than 200 characters")]
         public string? Address { get; set; }
+
+        public string? TaxCode { get; set; }
     }
 
     public class UpdateCustomerDto
@@ -70,5 +74,7 @@ namespace PipeVolt_DAL.DTOS
 
         [StringLength(200, ErrorMessage = "Address can't be longer than 200 characters")]
         public string? Address { get; set; }
+
+        public string? TaxCode { get; set; }
     }
 }

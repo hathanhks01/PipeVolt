@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.DTOS;
+using PipeVolt_DAL.Models;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -11,7 +12,8 @@ namespace PipeVolt_Api.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
-        public AuthController(IAuthService auth)
+        private readonly PipeVoltDbContext _context;
+        public AuthController(IAuthService auth, PipeVoltDbContext context)
         {
             _authService = auth;
         }

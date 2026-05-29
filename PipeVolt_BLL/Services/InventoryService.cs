@@ -50,7 +50,7 @@ namespace PipeVolt_BLL.Services
                 throw;
             }
         }
-        public async Task<bool> ReceiveFromPurchaseOrderAsync(string warehouseCode, int purchaseOrderId)
+        public async Task<bool> ReceiveFromPurchaseOrderAsync(string warehouseCode, string purchaseOrderCode)
         {
             // 1. Tìm warehouse
             var warehouseQuery = await _warehouseRepo.QueryBy(w => w.WarehouseCode == warehouseCode);
@@ -59,7 +59,7 @@ namespace PipeVolt_BLL.Services
                 throw new KeyNotFoundException("Warehouse not found.");
 
             // 2. Lấy PurchaseOrder và các chi tiết
-            var poQuery = await _PurchaseOrderRepo.QueryBy(x => x.PurchaseOrderId == purchaseOrderId);
+            var poQuery = await _PurchaseOrderRepo.QueryBy(x => x.PurchaseOrderCode == purchaseOrderCode);
             var po = await poQuery
                 .Include(x => x.PurchaseOrderDetails)
                 .FirstOrDefaultAsync();

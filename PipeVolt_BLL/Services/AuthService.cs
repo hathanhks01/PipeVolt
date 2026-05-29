@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Google.Apis.Auth;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using PipeVolt_Api.Common.Repository;
 using PipeVolt_BLL.IServices;
@@ -14,7 +16,6 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using static PipeVolt_DAL.Common.DataType;
-using Google.Apis.Auth;
 
 namespace PipeVolt_BLL.Services
 {
@@ -120,11 +121,10 @@ namespace PipeVolt_BLL.Services
                 _logger.LogInformation($"User {registerDTO.Username} registered successfully");
                 var cart = new Cart
                 {
-                    CartId=user.UserId, 
                     CustomerId = customer.CustomerId,
                 };
-                await _CartGenericRepository.Create(cart);
-                _logger.LogInformation($"Cart {cart.CartId} registered successfully");
+                var createdCart = await _CartGenericRepository.Create(cart);
+                _logger.LogInformation($"Cart {createdCart.CartId} ...");
                 return new AuthResponseDto
                 {
                     Success = true,
@@ -236,11 +236,10 @@ namespace PipeVolt_BLL.Services
                     // Tạo cart cho user mới
                     var cart = new Cart
                     {
-                        CartId = user.UserId,
                         CustomerId = customer.CustomerId,
                     };
-                    await _CartGenericRepository.Create(cart);
-
+                    var createdCart = await _CartGenericRepository.Create(cart);
+                    _logger.LogInformation($"Cart {createdCart.CartId} ...");
                     _logger.LogInformation($"New Google user {payload.Email} registered successfully");
                 }
 

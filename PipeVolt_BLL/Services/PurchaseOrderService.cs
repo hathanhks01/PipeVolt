@@ -126,41 +126,58 @@ namespace PipeVolt_BLL.Services
             }
         }
 
-        private async Task<int> ResolveEmployeeIdFromLoggedInUserAsync()
+        private async Task<int?> ResolveEmployeeIdFromLoggedInUserAsync()
         {
             var httpContext = _httpContextAccessor.HttpContext;
-            if (httpContext?.User == null) throw new UnauthorizedAccessException("Missing http context user");
+            if (httpContext?.User == null)
+            {
+                _logger.LogWarning("Purchase order creation failed because no authenticated user was found in the HTTP context.");
+                throw new UnauthorizedAccessException("Missing http context user");
+            }
 
             var claims = httpContext.User.Claims.Select(c => $"{c.Type}={c.Value}").ToList();
-            //_logger.LogError($"Available claims: {string.Join(", ", claims)}");
-
             var sub =
                 httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
                 httpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ??
                 httpContext.User.FindFirst("sub")?.Value;
-            if (string.IsNullOrWhiteSpace(sub)) throw new UnauthorizedAccessException($"Missing user id claim. Available claims: {string.Join(", ", claims)}");
+            if (string.IsNullOrWhiteSpace(sub))
+            {
+                _logger.LogWarning($"Purchase order creation failed due to missing user id claim. Available claims: {string.Join(", ", claims)}");
+                throw new UnauthorizedAccessException($"Missing user id claim. Available claims: {string.Join(", ", claims)}");
+            }
 
             if (!int.TryParse(sub, out var userId))
+            {
+                _logger.LogWarning($"Purchase order creation failed due to invalid user id claim: {sub}");
                 throw new UnauthorizedAccessException("Invalid user id claim");
+            }
 
-            // Tìm user để đọc user_type và employee_id
             var user = (await _userRepo.FindBy(u => u.UserId == userId)).FirstOrDefault();
-            if (user == null) throw new UnauthorizedAccessException("User not found");
+            if (user == null)
+            {
+                _logger.LogWarning($"Purchase order creation failed because UserAccount with ID {userId} was not found.");
+                throw new UnauthorizedAccessException("User not found");
+            }
 
             if (user.UserType == (int)DataType.UserType.Admin)
             {
-                // Admin không gắn với employee, theo yêu cầu set = 1
-                return 1;
+                _logger.LogInformation($"Admin user {userId} is creating a purchase order without an employee assignment.");
+                return null;
             }
 
             if (user.UserType == (int)DataType.UserType.Employee)
             {
                 if (user.EmployeeId == null)
+                {
+                    _logger.LogInformation($"Purchase order creation failed: employee user {userId} has no EmployeeId assigned.");
                     throw new InvalidOperationException("Employee user does not have EmployeeId");
+                }
 
+                _logger.LogInformation($"Employee user {userId} mapped to EmployeeId {user.EmployeeId} for purchase order creation.");
                 return user.EmployeeId.Value;
             }
 
+            _logger.LogWarning($"Purchase order creation failed: user {userId} has unsupported user type {user.UserType}.");
             throw new UnauthorizedAccessException("User is not allowed to create purchase orders");
         }
 
@@ -184,9 +201,7 @@ namespace PipeVolt_BLL.Services
                 }
             }
 
-            var nextNumber = maxSuffix + 1;
-            
-            // Format động: 000, 001, ..., 099, 100, ..., 999, 1000, ...
+            var nextNumber = maxSuffix + 1;          
             var suffixLength = nextNumber < 1000 ? 3 : nextNumber.ToString().Length;
             return $"{prefix}{nextNumber.ToString().PadLeft(suffixLength, '0')}";
         }

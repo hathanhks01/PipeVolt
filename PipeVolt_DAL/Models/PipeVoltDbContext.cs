@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 
@@ -38,8 +38,6 @@ public partial class PipeVoltDbContext : DbContext
 
     public virtual DbSet<Supplier> Suppliers { get; set; }
 
-    public virtual DbSet<Supply> Supplies { get; set; }
-
     public virtual DbSet<UserAccount> UserAccounts { get; set; }
 
     public virtual DbSet<Warehouse> Warehouses { get; set; }
@@ -55,7 +53,7 @@ public partial class PipeVoltDbContext : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseSqlServer("Server=MSI\\SQLEXPRESS;Database=PipeVolt;Trusted_Connection=True;TrustServerCertificate=True;");
+        => optionsBuilder.UseSqlServer("Server=MSI\\SQLEXPRESS;Database=PipeVolt;User Id=wuy;Password=123456;TrustServerCertificate=True");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -177,19 +175,6 @@ public partial class PipeVoltDbContext : DbContext
             entity.HasKey(e => e.SupplierId).HasName("PK__SUPPLIER__6EE594E812C79687");
 
             entity.Property(e => e.SupplierId).ValueGeneratedOnAdd();
-        });
-
-        modelBuilder.Entity<Supply>(entity =>
-        {
-            entity.HasKey(e => e.SupplyId).HasName("PK__SUPPLY__4870CD837B5C9A2E");
-
-            entity.HasOne(d => d.Product).WithMany(p => p.Supplies)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__SUPPLY__product___48CFD27E");
-
-            entity.HasOne(d => d.Supplier).WithMany(p => p.Supplies)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__SUPPLY__supplier__49C3F6B7");
         });
 
         modelBuilder.Entity<UserAccount>(entity =>
