@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using PipeVolt_DAL.Common;
 
 namespace PipeVolt_BLL.Services
 {
@@ -66,7 +67,7 @@ namespace PipeVolt_BLL.Services
                 _logger.LogInformation($"GetRevenueProfitAsync: {fromDate} to {toDate}");
 
                 var salesOrders = await _salesOrderRepo.FindBy(
-                    so => so.OrderDate >= fromDate && so.OrderDate <= toDate && (int?)so.Status == 5
+                    so => so.OrderDate >= fromDate && so.OrderDate <= toDate && (int?)so.Status == (int)DataType.SaleStatus.Completed
                 ); // Status 5 = Completed
 
                 var orderDetails = await _orderDetailRepo.FindBy(

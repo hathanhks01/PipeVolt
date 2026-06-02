@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.DTOS;
 using System;
@@ -101,6 +101,29 @@ namespace PipeVolt_Api.Controllers
                 return Ok(orderId);
             }
             catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi máy chủ: {ex.Message}");
+            }
+        }
+        /// <summary>
+        /// Thanh toán giỏ hàng (Legacy DTO)
+        /// </summary>
+        [HttpPost("checkout-dto")]
+        public async Task<IActionResult> Checkout([FromBody] CheckoutDto dto)
+        {
+            try
+            {
+                if (dto == null || dto.Items == null || !dto.Items.Any())
+                    return BadRequest("Checkout items cannot be empty.");
+
+                await _checkoutService.CheckoutAsync(dto);
+                return Ok(new { message = "Checkout successful" });
+            }
+            catch (ArgumentException ex)
             {
                 return BadRequest(ex.Message);
             }

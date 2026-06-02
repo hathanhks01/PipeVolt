@@ -37,7 +37,7 @@ public partial class Product
     [Column("description")]
     public string? Description { get; set; }
 
-    public int? quantity { get; set; } 
+    // REMOVED: quantity column dropped from DB, use Inventory table instead
 
     [Column("image_url")]
     [StringLength(255)]

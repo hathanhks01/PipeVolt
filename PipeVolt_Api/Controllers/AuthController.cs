@@ -12,8 +12,7 @@ namespace PipeVolt_Api.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
-        private readonly PipeVoltDbContext _context;
-        public AuthController(IAuthService auth, PipeVoltDbContext context)
+        public AuthController(IAuthService auth)
         {
             _authService = auth;
         }

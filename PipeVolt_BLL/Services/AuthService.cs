@@ -28,7 +28,7 @@ namespace PipeVolt_BLL.Services
         private readonly IGenericRepository<Cart> _CartGenericRepository;
         private readonly ILoggerService _logger;
         private readonly IConfiguration _configuration;
-        private readonly IHttpContextAccessor _httpContextAccessor; 
+        private readonly IHttpContextAccessor _httpContextAccessor;
         public AuthService(
             IUserAccountRepository UserAccountRepository,
             ICustomerRepository CustomerRepository,
@@ -99,7 +99,7 @@ namespace PipeVolt_BLL.Services
                     _logger.LogWarning($"Registration failed: Username {registerDTO.Username} already exists");
                     return new AuthResponseDto { Success = false, Message = "Username already exists" };
                 }
-               
+
                 string HashedPassword = BCrypt.Net.BCrypt.HashPassword(registerDTO.Password);
                 string code = await ICustomerRepository.RenderCodeAsync();
                 var customer = new Customer
@@ -153,27 +153,39 @@ namespace PipeVolt_BLL.Services
 
         private string GenerateJwtToken(UserAccount user)
         {
-            var jwtKey = _configuration["Jwt:Key"];
-            var jwtIssuer = _configuration["Jwt:Issuer"];
-            var jwtAudience = _configuration["Jwt:Audience"];
-            var jwtExpireMinutes = int.Parse(_configuration["Jwt:ExpireMinutes"]);
+            // Sửa lỗi 3: đổi "Jwt:" thành "JWT:" cho đúng với appsettings.json
+            var jwtKey = _configuration["JWT:Key"];
+            var jwtIssuer = _configuration["JWT:Issuer"];
+            var jwtAudience = _configuration["JWT:Audience"];
+            var jwtExpireMinutes = int.Parse(_configuration["JWT:ExpireMinutes"]);
+
+            if (string.IsNullOrEmpty(jwtKey))
+                throw new InvalidOperationException("JWT:Key is not configured.");
+
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-            var claims = new[]
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
-                new Claim(JwtRegisteredClaimNames.Name, user.Username),
-                new Claim("userType", user.UserType.ToString()),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-            };
+
+            var claims = new List<Claim>
+    {
+        new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
+        new Claim(JwtRegisteredClaimNames.Name, user.Username),
+        new Claim("userType", user.UserType.ToString()),
+        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+    };
+
+            if (user.CustomerId.HasValue)
+                claims.Add(new Claim("customerId", user.CustomerId.Value.ToString()));
+
+            if (user.EmployeeId.HasValue)
+                claims.Add(new Claim("employeeId", user.EmployeeId.Value.ToString()));
 
             var token = new JwtSecurityToken(
-                   issuer: jwtIssuer,
-                   audience: jwtAudience,
-                   claims: claims,
-                   expires: DateTime.UtcNow.AddMinutes(jwtExpireMinutes),
-                   signingCredentials: credentials
-               );   
+                issuer: jwtIssuer,
+                audience: jwtAudience,
+                claims: claims,
+                expires: DateTime.UtcNow.AddMinutes(jwtExpireMinutes),
+                signingCredentials: credentials
+            );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
@@ -229,7 +241,7 @@ namespace PipeVolt_BLL.Services
                         UserType = (int)UserType.Customer,
                         CustomerId = customer.CustomerId,
                         Status = (int)UserStatus.Active,
-                       // IsGoogleUser = true // Thêm field này vào model nếu cần
+                        // IsGoogleUser = true // Thêm field này vào model nếu cần
                     };
                     await _UserGenericRepository.Create(user);
 

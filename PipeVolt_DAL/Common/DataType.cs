@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -41,7 +41,7 @@ namespace PipeVolt_DAL.Common
         public enum PaymentTransactionStatus
         {
             Pending = 0,
-            Suscess = 1,
+            Success = 1,
             Failed = 2
         }
         public enum SenderType

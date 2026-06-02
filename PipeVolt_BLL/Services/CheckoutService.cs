@@ -1,8 +1,10 @@
 using AutoMapper;
 using Microsoft.EntityFrameworkCore; // Added for Include and FirstOrDefaultAsync
+using PipeVolt_Api.Common;
 using PipeVolt_Api.Common.Repository;
 using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.Common;
+using PipeVolt_DAL.Common.Repository;
 using PipeVolt_DAL.DTOS;
 using PipeVolt_DAL.IRepositories;
 using PipeVolt_DAL.Models;
@@ -31,6 +33,7 @@ namespace PipeVolt_BLL.Services
         private readonly IMapper _mapper;
         private readonly ILoggerService _logger;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ICacheService _cacheService;
 
         public CheckoutService(
             IGenericRepository<Cart> cartRepo,
@@ -46,7 +49,8 @@ namespace PipeVolt_BLL.Services
             IGenericRepository<Employee> employeeRepo,
             IMapper mapper,
             ILoggerService logger,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            ICacheService cacheService)
         {
             _cartRepo = cartRepo ?? throw new ArgumentNullException(nameof(cartRepo));
             _cartItemRepo = cartItemRepo ?? throw new ArgumentNullException(nameof(cartItemRepo));
@@ -62,6 +66,7 @@ namespace PipeVolt_BLL.Services
             _mapper = mapper ?? throw new ArgumentNullException(nameof(mapper));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
+            _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
         }
 
         public async Task<int> CheckoutAsync(int customerId, int paymentMethodId)
@@ -106,7 +111,12 @@ namespace PipeVolt_BLL.Services
                         }
 
                         // 3. Kiểm tra tồn kho
-                        foreach (var item in cart.CartItems)
+                        var groupedItems = cart.CartItems
+                            .GroupBy(ci => ci.ProductId)
+                            .Select(g => new { ProductId = g.Key, Quantity = g.Sum(ci => ci.Quantity), ProductName = g.First().Product?.ProductName })
+                            .ToList();
+
+                        foreach (var item in groupedItems)
                         {
                             var inventoryList = await (await _inventoryRepo.QueryBy(i => i.ProductId == item.ProductId))
                                 .OrderBy(i => i.UpdatedAt) // FIFO: nhập trước xuất trước
@@ -114,8 +124,8 @@ namespace PipeVolt_BLL.Services
                             var totalStock = inventoryList.Sum(i => i.Quantity);
                             if (totalStock < item.Quantity)
                             {
-                                _logger.LogWarning($"Insufficient stock for product {item.ProductId}");
-                                throw new InvalidOperationException($"Sản phẩm {item.Product?.ProductName} không đủ tồn kho.");
+                                _logger.LogWarning($"Insufficient stock for product {item.ProductId}. Available: {totalStock}, Requested: {item.Quantity}");
+                                throw new InvalidOperationException($"Sản phẩm {item.ProductName} không đủ tồn kho. Có sẵn: {totalStock}, yêu cầu: {item.Quantity}");
                             }
                         }
 
@@ -209,6 +219,10 @@ namespace PipeVolt_BLL.Services
 
                         // 11. Commit transaction
                         await transaction.CommitAsync();
+                        
+                        // 12. Clear product cache
+                        _cacheService.Remove(CacheKeys.AllProducts);
+
                         _logger.LogInformation($"Checkout completed for customer {customerId}. Order ID: {createdOrder.OrderId}");
 
                         return createdOrder.OrderId;
@@ -269,7 +283,12 @@ namespace PipeVolt_BLL.Services
                         }
 
                         // 3. Kiểm tra tồn kho
-                        foreach (var item in selectedCartItems)
+                        var groupedSelectedItems = selectedCartItems
+                            .GroupBy(ci => ci.ProductId)
+                            .Select(g => new { ProductId = g.Key, Quantity = g.Sum(ci => ci.Quantity), ProductName = g.First().Product?.ProductName })
+                            .ToList();
+
+                        foreach (var item in groupedSelectedItems)
                         {
                             var inventoryList = await (await _inventoryRepo.QueryBy(i => i.ProductId == item.ProductId))
                                 .OrderBy(i => i.UpdatedAt) // FIFO: nhập trước xuất trước
@@ -277,8 +296,8 @@ namespace PipeVolt_BLL.Services
                             var totalStock = inventoryList.Sum(i => i.Quantity);
                             if (totalStock < item.Quantity)
                             {
-                                _logger.LogWarning($"Insufficient stock for product {item.ProductId}");
-                                throw new InvalidOperationException($"Sản phẩm {item.Product?.ProductName} không đủ tồn kho.");
+                                _logger.LogWarning($"Insufficient stock for product {item.ProductId}. Available: {totalStock}, Requested: {item.Quantity}");
+                                throw new InvalidOperationException($"Sản phẩm {item.ProductName} không đủ tồn kho. Có sẵn: {totalStock}, yêu cầu: {item.Quantity}");
                             }
                         }
 
@@ -390,6 +409,10 @@ namespace PipeVolt_BLL.Services
 
                         // 13. Commit transaction
                         await transaction.CommitAsync();
+
+                        // 14. Clear product cache
+                        _cacheService.Remove(CacheKeys.AllProducts);
+
                         _logger.LogInformation($"Partial checkout completed for customer {customerId}. Order ID: {createdOrder.OrderId}");
 
                         return createdOrder.OrderId;
@@ -584,6 +607,10 @@ namespace PipeVolt_BLL.Services
 
                         // 12. Commit transaction
                         await transaction.CommitAsync();
+
+                        // 13. Clear product cache
+                        _cacheService.Remove(CacheKeys.AllProducts);
+
                         _logger.LogInformation($"POS checkout completed. Order ID: {createdOrder.OrderId}, Amount: {netAmount}");
 
                         return createdOrder.OrderId;
@@ -596,6 +623,59 @@ namespace PipeVolt_BLL.Services
                     }
                 }
             });
+        }
+
+        public async Task CheckoutAsync(CheckoutDto checkoutDto)
+        {
+            if (checkoutDto == null || checkoutDto.Items == null || !checkoutDto.Items.Any())
+            {
+                _logger.LogWarning("Invalid checkout request: no items provided");
+                throw new ArgumentException("Checkout items cannot be empty.");
+            }
+
+            _logger.LogInformation("Adding new sales order (legacy DTO)");
+
+            // Tính tổng tiền
+            double totalAmount = checkoutDto.Items.Sum(i => i.UnitPrice * i.Quantity);
+
+            var salesOrder = new SalesOrder
+            {
+                CustomerId = checkoutDto.CustomerId,
+                OrderDate = DateTime.UtcNow,
+                Status = (int)SaleStatus.Pending,
+                PaymentMethodId = checkoutDto.PaymentMethodId,
+                TotalAmount = totalAmount,
+
+            };
+
+            await _salesOrderRepo.Create(salesOrder);
+            _logger.LogInformation("Add new sales order success (legacy DTO)");
+
+            foreach (var item in checkoutDto.Items)
+            {
+                var orderDetail = new OrderDetail
+                {
+                    OrderId = salesOrder.OrderId,
+                    ProductId = item.ProductId,
+                    Quantity = item.Quantity,
+                    UnitPrice = item.UnitPrice
+                };
+                await _orderDetailRepo.Create(orderDetail);
+            }
+
+            var cartItemIds = checkoutDto.Items.Select(i => i.CartItemId).ToList();
+            if (cartItemIds.Any())
+            {
+                _logger.LogInformation("Deleting cart items after checkout (legacy DTO)");
+                var cartItemsQueryable = await _cartItemRepo.QueryBy(x => cartItemIds.Contains(x.CartItemId));
+                var cartItems = cartItemsQueryable.ToList(); 
+
+                foreach (var cartItem in cartItems)
+                {
+                    await _cartItemRepo.Delete(cartItem);
+                }
+                _logger.LogInformation("Deleted cart items after checkout (legacy DTO)");
+            }
         }
 
         // Giả lập xử lý thanh toán

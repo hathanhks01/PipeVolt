@@ -12,9 +12,12 @@ public class AutoMapperProfiles : Profile
         CreateMap<CreateBrandDto, Brand>();
         CreateMap<UpdateBrandDto, Brand>();
 
+        // quantity không còn là cột trong PRODUCT - bỏ map quantity từ entity
+        // quantity trong ProductDto sẽ được gán thủ công từ Inventory trong Service
         CreateMap<Product, ProductDto>()
-           .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Category.CategoryName))
-           .ForMember(dest => dest.BrandName, opt => opt.MapFrom(src => src.Brand.BrandName));
+           .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Category != null ? src.Category.CategoryName : null))
+           .ForMember(dest => dest.BrandName, opt => opt.MapFrom(src => src.Brand != null ? src.Brand.BrandName : null))
+           .ForMember(dest => dest.quantity, opt => opt.Ignore()); // quantity lấy từ Inventory, không map từ Product entity
 
         // DTO → Entity (mới thêm)
         CreateMap<CreateProductDto, Product>();

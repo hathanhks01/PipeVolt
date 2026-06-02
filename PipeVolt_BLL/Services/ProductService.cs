@@ -20,13 +20,16 @@ namespace PipeVolt_BLL.Services
     {
         private readonly IGenericRepository<Product> _repo;
         private readonly IGenericRepository<ProductCategory> _categoryRepo;
+        private readonly IGenericRepository<Inventory> _inventoryRepo;
         private readonly IMapper _mapper;
         private readonly ILoggerService _logger;
         private readonly IMemoryCache _cache;
         private readonly ICacheService _cacheService;
+
         public ProductService(
             IGenericRepository<Product> repo,
             IGenericRepository<ProductCategory> categoryRepo,
+            IGenericRepository<Inventory> inventoryRepo,
             IMapper mapper,
             ILoggerService logger,
             IMemoryCache cache,
@@ -34,49 +37,54 @@ namespace PipeVolt_BLL.Services
         {
             _repo = repo;
             _categoryRepo = categoryRepo ?? throw new ArgumentNullException(nameof(categoryRepo));
+            _inventoryRepo = inventoryRepo ?? throw new ArgumentNullException(nameof(inventoryRepo));
             _mapper = mapper;
             _logger = logger;
             _cacheService = cacheService;
             _cache = cache;
         }
 
+        /// <summary>
+        /// Populate quantity vào danh sách ProductDto từ bảng Inventory
+        /// (cột quantity đã bị drop khỏi bảng PRODUCT)
+        /// </summary>
+        private async Task PopulateInventoryQuantitiesAsync(List<ProductDto> dtos)
+        {
+            if (dtos == null || !dtos.Any()) return;
+
+            var productIds = dtos.Select(p => p.ProductId).ToList();
+            var inventories = await _inventoryRepo.QueryBy(i => productIds.Contains(i.ProductId));
+            var inventoryList = await inventories.ToListAsync();
+
+            foreach (var dto in dtos)
+            {
+                dto.quantity = inventoryList
+                    .Where(i => i.ProductId == dto.ProductId)
+                    .Sum(i => i.Quantity);
+            }
+        }
+
         public async Task<ProductDto> GetProductByIdAsync(int productId)
         {
             try
             {
-                var sql = @"
-            SELECT 
-                p.product_id,
-                p.product_code,
-                p.product_name,
-                p.category_id,
-                p.brand_id,
-                p.selling_price,
-                p.unit,
-                p.description,
-                p.image_url,
-                ISNULL(SUM(i.quantity), 0) AS quantity
-            FROM PRODUCT p
-            LEFT JOIN INVENTORY i ON p.product_id = i.product_id
-            WHERE p.product_id = @p0
-            GROUP BY 
-                p.product_id,
-                p.product_code,
-                p.product_name,
-                p.category_id,
-                p.brand_id,
-                p.selling_price,
-                p.unit,
-                p.description,
-                p.image_url";
-
-                var productSearch = await _repo.SqlQuery<Product>(sql,productId);
-                var product = productSearch.FirstOrDefault();
+                var products = await _repo.QueryBy(p => p.ProductId == productId);
+                var product = await products
+                    .Include(p => p.Brand)
+                    .Include(p => p.Category)
+                    .FirstOrDefaultAsync();
 
                 if (product == null)
                     throw new KeyNotFoundException("Product not found.");
 
-                return _mapper.Map<ProductDto>(product);
+                var dto = _mapper.Map<ProductDto>(product);
+
+                // Lấy quantity từ bảng Inventory thay vì cột đã drop
+                var inventories = await _inventoryRepo.QueryBy(i => i.ProductId == productId);
+                var inventoryList = await inventories.ToListAsync();
+                dto.quantity = inventoryList.Sum(i => i.Quantity);
+
+                return dto;
             }
             catch (Exception ex)
             {
@@ -90,36 +98,50 @@ namespace PipeVolt_BLL.Services
             try
             {
                 var products = await _repo.QueryBy(p => p.ProductId == productId);
-                var product = await Task.Run(() => products.FirstOrDefault());
+                var product = await products
+                    .Include(p => p.Brand)
+                    .Include(p => p.Category)
+                    .FirstOrDefaultAsync();
+
                 if (product == null)
                     throw new KeyNotFoundException("Product not found.");
 
-                // Lấy các sản phẩm liên quan: cùng CategoryId, khác ProductId hiện tại, lấy tối đa 5 sản phẩm
+                // Lấy các sản phẩm liên quan: cùng CategoryId, khác ProductId hiện tại, tối đa 5
                 List<Product> relatedProducts = new List<Product>();
                 if (product.CategoryId.HasValue)
                 {
                     var relatedQuery = await _repo.QueryBy(p =>
                         p.CategoryId == product.CategoryId &&
                         p.ProductId != product.ProductId);
-                    relatedProducts = relatedQuery.Take(5).ToList();
+                    relatedProducts = await relatedQuery
+                        .Include(p => p.Brand)
+                        .Include(p => p.Category)
+                        .Take(5)
+                        .ToListAsync();
                 }
 
                 var productDto = _mapper.Map<ProductDto>(product);
 
-                // Nếu ProductDto chưa có property RelatedProducts, bạn cần thêm vào class ProductDto:
-                // public List<ProductDto> RelatedProducts { get; set; }
-                // Nếu đã có, gán như sau:
+                // Lấy quantity từ Inventory cho sản phẩm chính
+                var mainInventories = await _inventoryRepo.QueryBy(i => i.ProductId == productId);
+                productDto.quantity = (await mainInventories.ToListAsync()).Sum(i => i.Quantity);
+
+                // Map related products và populate quantity từ Inventory
+                var relatedDtos = _mapper.Map<List<ProductDto>>(relatedProducts);
+                await PopulateInventoryQuantitiesAsync(relatedDtos);
+
                 if (productDto != null)
-                    productDto.RelatedProducts = _mapper.Map<List<ProductDto>>(relatedProducts);
+                    productDto.RelatedProducts = relatedDtos;
 
                 return productDto;
             }
             catch (Exception ex)
             {
-                _logger.LogError("Error in GetProductByIdAsync", ex);
+                _logger.LogError("Error in GetProductByIdAndRelatedAsync", ex);
                 throw;
             }
         }
+
         public async Task<IEnumerable<ProductDto>> GetAllProductsAsync()
         {
             return await _cacheService.GetOrSetAsync(
@@ -128,33 +150,7 @@ namespace PipeVolt_BLL.Services
                 {
                     try
                     {
-                        var sql = @"
-                SELECT 
-                    p.product_id,
-                    p.product_code,
-                    p.product_name,
-                    p.category_id,
-                    p.brand_id,
-                    p.selling_price,
-                    p.unit,
-                    p.description,
-                    p.image_url,
-                    ISNULL(SUM(i.quantity), 0) AS quantity
-                FROM PRODUCT p
-                LEFT JOIN INVENTORY i ON p.product_id = i.product_id
-                GROUP BY 
-                    p.product_id,
-                    p.product_code,
-                    p.product_name,
-                    p.category_id,
-                    p.brand_id,
-                    p.selling_price,
-                    p.unit,
-                    p.description,
-                    p.image_url";
-
-                        var products = await _repo.SqlQuery<Product>(sql);
-                        return _mapper.Map<IEnumerable<ProductDto>>(products);
+                        return await GetAllProductsWithInventoryAsync();
                     }
                     catch (Exception ex)
                     {
@@ -165,13 +161,49 @@ namespace PipeVolt_BLL.Services
                 TimeSpan.FromMinutes(30)
             );
         }
+
+        /// <summary>
+        /// Lấy tất cả sản phẩm kèm quantity tổng hợp từ bảng Inventory
+        /// </summary>
+        private async Task<IEnumerable<ProductDto>> GetAllProductsWithInventoryAsync()
+        {
+            var products = await _repo.QueryBy(p => true);
+            var productList = await products
+                .Include(p => p.Brand)
+                .Include(p => p.Category)
+                .ToListAsync();
+
+            // Lấy toàn bộ inventory một lần, group theo ProductId
+            var allInventories = await _inventoryRepo.GetAll();
+            var inventoryLookup = allInventories
+                .GroupBy(i => i.ProductId)
+                .ToDictionary(g => g.Key, g => g.Sum(i => i.Quantity));
+
+            var dtos = _mapper.Map<List<ProductDto>>(productList);
+            foreach (var dto in dtos)
+            {
+                dto.quantity = inventoryLookup.TryGetValue(dto.ProductId, out var qty) ? qty : 0;
+            }
+
+            return dtos;
+        }
+
         public async Task<IEnumerable<ProductDto>> GetPopularProductsAsync()
         {
             try
             {
-                string sql = "SELECT TOP 5 * FROM PRODUCT ORDER BY product_name\r\n"; 
-                var products = await _repo.SqlQuery<Product>(sql);
-                return _mapper.Map<IEnumerable<ProductDto>>(products);
+                var products = await _repo.QueryBy(p => true);
+                var productList = await products
+                    .Include(p => p.Brand)
+                    .Include(p => p.Category)
+                    .OrderBy(p => p.ProductName)
+                    .Take(5)
+                    .ToListAsync();
+
+                var dtos = _mapper.Map<List<ProductDto>>(productList);
+                await PopulateInventoryQuantitiesAsync(dtos);
+
+                return dtos;
             }
             catch (Exception ex)
             {
@@ -202,7 +234,12 @@ namespace PipeVolt_BLL.Services
 
                 var created = await _repo.Create(entity);
                 _cacheService.Remove(CacheKeys.AllProducts);
-                return _mapper.Map<ProductDto>(created);
+
+                var resultDto = _mapper.Map<ProductDto>(created);
+                // Sản phẩm mới tạo chưa có trong Inventory => quantity = 0
+                resultDto.quantity = 0;
+
+                return resultDto;
             }
             catch (Exception ex)
             {
@@ -238,7 +275,14 @@ namespace PipeVolt_BLL.Services
 
                 await _repo.Update(entity);
                 _cacheService.Remove(CacheKeys.AllProducts);
-                return _mapper.Map<ProductDto>(entity);
+
+                var resultDto = _mapper.Map<ProductDto>(entity);
+
+                // Populate quantity từ Inventory sau khi update
+                var inventories = await _inventoryRepo.QueryBy(i => i.ProductId == productId);
+                resultDto.quantity = (await inventories.ToListAsync()).Sum(i => i.Quantity);
+
+                return resultDto;
             }
             catch (Exception ex)
             {
@@ -283,7 +327,7 @@ namespace PipeVolt_BLL.Services
                 throw;
             }
         }
-        // Phương thức mới: Lọc sản phẩm theo CategoryId
+
         public async Task<List<ProductDto>> GetProductsByCategoryIdAsync(int categoryId)
         {
             if (categoryId <= 0)
@@ -318,10 +362,13 @@ namespace PipeVolt_BLL.Services
                     throw new KeyNotFoundException($"Không có sản phẩm nào thuộc danh mục {categoryId}.");
                 }
 
-                var result = _mapper.Map<List<ProductDto>>(products);
-                _logger.LogInformation($"Đã lấy {result.Count} sản phẩm thuộc danh mục {categoryId}");
+                var dtos = _mapper.Map<List<ProductDto>>(products);
 
-                return result;
+                // Populate quantity từ Inventory
+                await PopulateInventoryQuantitiesAsync(dtos);
+
+                _logger.LogInformation($"Đã lấy {dtos.Count} sản phẩm thuộc danh mục {categoryId}");
+                return dtos;
             }
             catch (Exception ex)
             {
@@ -329,22 +376,29 @@ namespace PipeVolt_BLL.Services
                 throw;
             }
         }
+
         public async Task<List<ProductDto>> SearchTemp(string keyword)
         {
             try
             {
-                string sql = @"
-                        SELECT a.* 
-                        FROM PRODUCT a 
-                        LEFT JOIN PRODUCT_CATEGORY b ON a.category_id = b.category_id 
-                        left join BRAND c on a.brand_id =c.brand_id 
-                        WHERE a.product_name LIKE @p0 OR b.category_name LIKE @p0 OR c.brand_name LIKE @p0";
+                // Dùng LINQ thay raw SQL vì cột quantity đã bị drop khỏi PRODUCT
+                var products = await _repo.QueryBy(p =>
+                    p.ProductName.Contains(keyword) ||
+                    (p.Category != null && p.Category.CategoryName.Contains(keyword)) ||
+                    (p.Brand != null && p.Brand.BrandName.Contains(keyword)));
 
-                string likeKeyword = $"%{keyword?.Trim()}%";
-                var list = await _repo.SqlQuery<Product>(sql, likeKeyword);
-                var result = _mapper.Map<List<ProductDto>>(list);
-                _logger.LogInformation($"Found {result.Count} products matching keyword '{keyword}'");
-                return result;
+                var productList = await products
+                    .Include(p => p.Category)
+                    .Include(p => p.Brand)
+                    .ToListAsync();
+
+                var dtos = _mapper.Map<List<ProductDto>>(productList);
+
+                // Populate quantity từ Inventory
+                await PopulateInventoryQuantitiesAsync(dtos);
+
+                _logger.LogInformation($"Found {dtos.Count} products matching keyword '{keyword}'");
+                return dtos;
             }
             catch (Exception ex)
             {
@@ -352,7 +406,5 @@ namespace PipeVolt_BLL.Services
                 throw;
             }
         }
-
-
     }
 }
