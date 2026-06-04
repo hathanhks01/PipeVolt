@@ -21,11 +21,19 @@ namespace PipeVolt_DAL.Repositories
         }
         public async Task<string> RenderCodeAsync()
         {
-            int customerCount = await _context.Customers.CountAsync();
+            var maxCode = await _context.Customers
+                .Where(c => c.CustomerCode != null && c.CustomerCode.StartsWith("KH"))
+                .Select(c => c.CustomerCode)
+                .OrderByDescending(c => c)
+                .FirstOrDefaultAsync();
 
-            string code = "KH" + (customerCount + 1); 
+            int nextNumber = 1;
+            if (maxCode != null && int.TryParse(maxCode.Substring(2), out int current))
+            {
+                nextNumber = current + 1;
+            }
 
-            return code;  
+            return "KH" + nextNumber;
         }
     }
 }

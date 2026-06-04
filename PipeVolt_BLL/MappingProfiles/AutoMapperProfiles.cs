@@ -70,7 +70,8 @@ public class AutoMapperProfiles : Profile
         CreateMap<UpdatePurchaseOrderDetailDto, PurchaseOrderDetail>();
 
         // SalesOrder
-        CreateMap<SalesOrder, SalesOrderDto>();
+        CreateMap<SalesOrder, SalesOrderDto>()
+            .ForMember(dest => dest.PaymentMethod, opt => opt.MapFrom(src => src.PaymentMethod != null ? src.PaymentMethod.MethodName : null));
         CreateMap<CreateSalesOrderDto, SalesOrder>()
             .ForMember(dest => dest.OrderId, opt => opt.Ignore());
         CreateMap<UpdateSalesOrderDto, SalesOrder>();

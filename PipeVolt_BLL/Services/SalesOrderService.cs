@@ -43,7 +43,8 @@ namespace PipeVolt_BLL.Services
             try
             {
                 _logger.LogInformation("Fetching all sales orders");
-                var data = await _repo.GetAll();
+                var query = await _repo.QueryAll();
+                var data = await query.Include(x => x.PaymentMethod).ToListAsync();
                 var result = _mapper.Map<List<SalesOrderDto>>(data);
                 _logger.LogInformation($"Fetched {result.Count} sales orders");
                 return result;
@@ -61,7 +62,7 @@ namespace PipeVolt_BLL.Services
             {
                 _logger.LogInformation($"Fetching sales order ID {id}");
                 var list = await _repo.QueryBy(x => x.OrderId == id);
-                var entity = list.FirstOrDefault();
+                var entity = await list.Include(x => x.PaymentMethod).FirstOrDefaultAsync();
                 if (entity == null)
                 {
                     _logger.LogWarning($"Sales order ID {id} not found");
@@ -83,7 +84,9 @@ namespace PipeVolt_BLL.Services
                 _logger.LogInformation("Adding new sales order");
                 var entity = _mapper.Map<SalesOrder>(dto);
                 var created = await _repo.Create(entity);
-                var result = _mapper.Map<SalesOrderDto>(created);
+                var createdQuery = await _repo.QueryBy(x => x.OrderId == created.OrderId);
+                var createdWithNav = await createdQuery.Include(x => x.PaymentMethod).FirstOrDefaultAsync();
+                var result = _mapper.Map<SalesOrderDto>(createdWithNav ?? created);
                 _logger.LogInformation($"Added sales order ID {result.OrderId}");
                 return result;
             }
@@ -115,7 +118,9 @@ namespace PipeVolt_BLL.Services
 
                 _mapper.Map(dto, entity);
                 await _repo.Update(entity);
-                var result = _mapper.Map<SalesOrderDto>(entity);
+                var updatedQuery = await _repo.QueryBy(x => x.OrderId == id);
+                var updatedWithNav = await updatedQuery.Include(x => x.PaymentMethod).FirstOrDefaultAsync();
+                var result = _mapper.Map<SalesOrderDto>(updatedWithNav ?? entity);
                 _logger.LogInformation($"Updated sales order ID {id}");
                 return result;
             }
@@ -163,8 +168,8 @@ namespace PipeVolt_BLL.Services
             }
 
             // Lấy các đơn hàng theo CustomerId
-            var salesOrders = await _repo.QueryBy(x => x.CustomerId == userAccount.CustomerId.Value);
-            var salesOrderList = salesOrders.ToList();
+            var salesOrdersQuery = await _repo.QueryBy(x => x.CustomerId == userAccount.CustomerId.Value);
+            var salesOrderList = await salesOrdersQuery.Include(x => x.PaymentMethod).ToListAsync();
 
             _logger.LogInformation($"Fetched {salesOrderList.Count} sales orders for userId: {userId}");
 
@@ -178,6 +183,7 @@ namespace PipeVolt_BLL.Services
             var query = await _repo.QueryBy(o => o.OrderId == orderId);
             var detailedQuery = query
                 .Include(o => o.Customer)
+                .Include(o => o.PaymentMethod)
                 .Include(o => o.OrderDetails)
                     .ThenInclude(od => od.Product);
 

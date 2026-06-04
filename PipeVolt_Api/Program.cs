@@ -134,6 +134,25 @@ builder.Services.AddAuthorizationPolicies();
 builder.Services.AddHttpClient();
 var app = builder.Build();
 
+// Tự động chạy Migration khi chạy trong môi trường Docker
+if (app.Environment.IsEnvironment("Docker"))
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var services = scope.ServiceProvider;
+        try
+        {
+            var context = services.GetRequiredService<PipeVoltDbContext>();
+            context.Database.Migrate();
+            Console.WriteLine("Database migration applied successfully.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred while migrating the database: {ex.Message}");
+        }
+    }
+}
+
 //// Configure the HTTP request pipeline.
 //if (app.Environment.IsDevelopment())
 //{
