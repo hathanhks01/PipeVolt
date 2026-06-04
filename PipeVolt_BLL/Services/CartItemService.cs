@@ -73,6 +73,13 @@ namespace PipeVolt_BLL.Services
             {
                 _logger.LogInformation($"Adding product {dto.ProductId} to cart {cartId}");
 
+                var cart = await _cartRepo.GetCartByIdAsync(cartId);
+                if (cart == null)
+                {
+                    _logger.LogWarning($"Cart {cartId} not found");
+                    throw new KeyNotFoundException($"Giỏ hàng #{cartId} không tồn tại.");
+                }
+
                 var product = await _productRepository.QueryBy(p => p.ProductId == dto.ProductId).Result.FirstOrDefaultAsync();
                 if (product == null)
                 {

@@ -23,5 +23,11 @@ namespace PipeVolt_DAL.Repositories
                              .ThenInclude(ci => ci.Product)
                              .FirstOrDefaultAsync();
         }
+
+        public async Task<Cart> GetCartByIdAsync(int cartId)
+        {
+            var query = await QueryBy(c => c.CartId == cartId);
+            return await query.FirstOrDefaultAsync();
+        }
     }
 }

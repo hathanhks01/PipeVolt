@@ -11,9 +11,10 @@ namespace PipeVolt_DAL.DTOS
     {
         public int CustomerId { get; set; }
 
+        public string? CustomerCode { get; set; }
+
         [Required(ErrorMessage = "Customer name is required")]
         [StringLength(100, ErrorMessage = "Customer name can't be longer than 100 characters")]
-        public string? CustomerCode { get; set; }
         public string CustomerName { get; set; } = string.Empty;
 
         [EmailAddress(ErrorMessage = "Invalid email address")]
@@ -59,9 +60,10 @@ namespace PipeVolt_DAL.DTOS
         [Required(ErrorMessage = "Customer ID is required")]
         public int CustomerId { get; set; }
 
+        public string? CustomerCode { get; set; }
+
         [Required(ErrorMessage = "Customer name is required")]
         [StringLength(100, ErrorMessage = "Customer name can't be longer than 100 characters")]
-        public string? CustomerCode { get; set; }
         public string CustomerName { get; set; } = string.Empty;
 
         [EmailAddress(ErrorMessage = "Invalid email address")]

@@ -5,5 +5,6 @@ namespace PipeVolt_DAL.IRepositories
     public interface ICartRepository
     {
         Task<Cart> GetCartByCustomerIdAsync(int customerId);
+        Task<Cart> GetCartByIdAsync(int cartId);
     }
 }

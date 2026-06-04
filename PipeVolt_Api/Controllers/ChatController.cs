@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.SignalR;
 using PipeVolt_BLL.IServices;
 using PipeVolt_BLL.Services;
 using PipeVolt_DAL.DTOS;
+using static PipeVolt_DAL.Common.DataType;
 
 namespace PipeVolt_Api.Controllers
 {
@@ -106,22 +107,27 @@ namespace PipeVolt_Api.Controllers
             {
                 var result = await _chatService.SendMessageAsync(messageDto);
 
-                // Gửi tin nhắn real-time qua SignalR
+                // Broadcast tin nhắn realtime đến tất cả trong phòng
                 await _hubContext.Clients.Group($"ChatRoom_{messageDto.ChatRoomId}")
                     .SendAsync("ReceiveMessage", result);
 
-                // Notify admin chat list if customer sends message
-                if (messageDto.SenderType == 2) // Customer
+                // Clear typing indicator
+                await _hubContext.Clients.Group($"ChatRoom_{messageDto.ChatRoomId}")
+                    .SendAsync("UserStoppedTyping", messageDto.SenderId);
+
+                // Nếu Customer gửi → notify Employee
+                if (messageDto.SenderType == (int)SenderType.Customer)
                 {
                     var room = await _chatService.GetChatRoomByIdAsync(messageDto.ChatRoomId);
+                    
                     if (room?.EmployeeId.HasValue == true)
                     {
-                        await _hubContext.Clients.Group($"AdminChatList_{room.EmployeeId}")
-                            .SendAsync("ChatListUpdated", messageDto.ChatRoomId);
+                        await _hubContext.Clients.Group($"Employee_{room.EmployeeId.Value}")
+                            .SendAsync("ChatListUpdated", new { chatRoomId = messageDto.ChatRoomId, hasNewMessage = true });
                     }
-                    // Also notify all employees for unassigned rooms
-                    await _hubContext.Clients.Group("AdminChatListAll")
-                        .SendAsync("ChatListUpdated", messageDto.ChatRoomId);
+                    
+                    await _hubContext.Clients.Group("AllEmployees")
+                        .SendAsync("ChatListUpdated", new { chatRoomId = messageDto.ChatRoomId, hasNewMessage = true });
                 }
 
                 return Ok(result);
