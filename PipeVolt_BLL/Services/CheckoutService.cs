@@ -427,6 +427,156 @@ namespace PipeVolt_BLL.Services
             });
         }
 
+        public async Task<CreatePendingOrderResult> CreatePendingOrderAsync(int customerId, int paymentMethodId, List<int> cartItemIds)
+        {
+            _logger.LogInformation($"Starting pending order creation for customer {customerId} with payment method {paymentMethodId} and cart items {string.Join(",", cartItemIds)}");
+
+            var executionStrategy = _unitOfWork.Context.Database.CreateExecutionStrategy();
+
+            return await executionStrategy.ExecuteAsync(async () =>
+            {
+                using (var transaction = await _unitOfWork.Context.Database.BeginTransactionAsync())
+                {
+                    try
+                    {
+                        // 1. Kiểm tra giỏ hàng và các CartItem được chọn
+                        var cartQuery = await _cartRepo.QueryBy(c => c.CustomerId == customerId);
+                        var cart = await cartQuery
+                            .Include(c => c.CartItems)
+                            .ThenInclude(ci => ci.Product)
+                            .Include(c => c.Customer)
+                            .FirstOrDefaultAsync();
+
+                        if (cart == null)
+                        {
+                            _logger.LogWarning($"Cart not found for customer {customerId}");
+                            throw new KeyNotFoundException("Giỏ hàng không tồn tại.");
+                        }
+
+                        var selectedCartItems = cart.CartItems
+                            .Where(ci => cartItemIds.Contains(ci.CartItemId))
+                            .ToList();
+
+                        if (!selectedCartItems.Any())
+                        {
+                            _logger.LogWarning($"No valid cart items selected for customer {customerId}");
+                            throw new InvalidOperationException("Không có sản phẩm nào được chọn để thanh toán.");
+                        }
+
+                        // 2. Kiểm tra phương thức thanh toán
+                        var paymentMethodQuery = await _paymentMethodRepo.QueryBy(pm => pm.PaymentMethodId == paymentMethodId);
+                        var paymentMethod = await paymentMethodQuery.FirstOrDefaultAsync();
+                        if (paymentMethod == null)
+                        {
+                            _logger.LogWarning($"Payment method {paymentMethodId} not found");
+                            throw new InvalidOperationException("Phương thức thanh toán không tồn tại.");
+                        }
+
+                        // 3. Kiểm tra tồn kho (chỉ check, chưa trừ)
+                        var groupedSelectedItems = selectedCartItems
+                            .GroupBy(ci => ci.ProductId)
+                            .Select(g => new { ProductId = g.Key, Quantity = g.Sum(ci => ci.Quantity), ProductName = g.First().Product?.ProductName })
+                            .ToList();
+
+                        foreach (var item in groupedSelectedItems)
+                        {
+                            var inventoryList = await (await _inventoryRepo.QueryBy(i => i.ProductId == item.ProductId))
+                                .OrderBy(i => i.UpdatedAt)
+                                .ToListAsync();
+                            var totalStock = inventoryList.Sum(i => i.Quantity);
+                            if (totalStock < item.Quantity)
+                            {
+                                _logger.LogWarning($"Insufficient stock for product {item.ProductId}. Available: {totalStock}, Requested: {item.Quantity}");
+                                throw new InvalidOperationException($"Sản phẩm {item.ProductName} không đủ tồn kho. Có sẵn: {totalStock}, yêu cầu: {item.Quantity}");
+                            }
+                        }
+
+                        // 4. Tạo SalesOrder
+                        var salesOrder = new SalesOrder
+                        {
+                            OrderCode = GenerateOrderCode(),
+                            CustomerId = customerId,
+                            OrderDate = DateTime.Now,
+                            TotalAmount = selectedCartItems.Sum(ci => ci.LineTotal),
+                            DiscountAmount = 0,
+                            TaxAmount = selectedCartItems.Sum(ci => ci.LineTotal) * 0.1,
+                            NetAmount = selectedCartItems.Sum(ci => ci.LineTotal) * 1.1,
+                            Status = (int)SaleStatus.Pending,
+                            PaymentMethodId = paymentMethodId
+                        };
+
+                        var createdOrder = await _salesOrderRepo.Create(salesOrder);
+
+                        // 5. Tạo OrderDetail
+                        var orderDetails = selectedCartItems.Select(ci => new OrderDetail
+                        {
+                            OrderId = createdOrder.OrderId,
+                            ProductId = ci.ProductId,
+                            Quantity = ci.Quantity,
+                            UnitPrice = ci.UnitPrice,
+                            Discount = 0,
+                            LineTotal = ci.Quantity * ci.UnitPrice
+                        }).ToList();
+
+                        await _orderDetailRepo.Create(orderDetails);
+
+                        // 6. Tạo Invoice
+                        var invoice = new Invoice
+                        {
+                            InvoiceNumber = GenerateInvoiceNumber(),
+                            OrderId = createdOrder.OrderId,
+                            CustomerId = customerId,
+                            CustomerName = cart.Customer?.CustomerName ?? "Unknown",
+                            CustomerAddress = cart.Customer?.Address,
+                            CustomerPhone = cart.Customer?.Phone,
+                            CustomerTaxCode = cart.Customer?.TaxCode,
+                            IssueDate = DateTime.Now,
+                            DueDate = DateTime.Now.AddDays(3),
+                            SubTotal = salesOrder.TotalAmount ?? 0,
+                            VatRate = 0.1,
+                            VatAmount = salesOrder.TaxAmount ?? 0,
+                            TotalAmount = salesOrder.NetAmount ?? 0,
+                            Status = (int)DataType.InvoiceStatus.Draft,
+                            PaymentStatus = (int)DataType.PaymentStatus.UnPaid
+                        };
+
+                        var createdInvoice = await _invoiceRepo.Create(invoice);
+
+                        // 7. Tạo InvoiceDetail
+                        var invoiceDetails = selectedCartItems.Select(ci => new InvoiceDetail
+                        {
+                            InvoiceId = createdInvoice.InvoiceId,
+                            ProductId = ci.ProductId,
+                            ProductName = ci.Product?.ProductName ?? "Unknown",
+                            ProductCode = ci.Product?.ProductCode ?? "Unknown",
+                            Unit = ci.Product?.Unit,
+                            Quantity = ci.Quantity,
+                            UnitPrice = ci.UnitPrice,
+                            Discount = 0
+                        }).ToList();
+
+                        await _invoiceDetailRepo.Create(invoiceDetails);
+
+                        // 8. Commit transaction
+                        await transaction.CommitAsync();
+
+                        return new CreatePendingOrderResult
+                        {
+                            OrderId = createdOrder.OrderId,
+                            OrderCode = createdOrder.OrderCode,
+                            TotalAmount = salesOrder.NetAmount ?? 0
+                        };
+                    }
+                    catch (Exception ex)
+                    {
+                        await transaction.RollbackAsync();
+                        _logger.LogError($"Pending order creation failed for customer {customerId}", ex);
+                        throw;
+                    }
+                }
+            });
+        }
+
         /// <summary>
         /// Thanh toán tại quầy (Point of Sale) - không cần giỏ hàng
         /// </summary>

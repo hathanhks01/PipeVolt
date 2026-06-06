@@ -68,16 +68,23 @@ namespace PipeVolt_BLL.Services
 
                 var salesOrders = await _salesOrderRepo.FindBy(
                     so => so.OrderDate >= fromDate && so.OrderDate <= toDate && (int?)so.Status == (int)DataType.SaleStatus.Completed
-                ); // Status 5 = Completed
+                );
 
                 var orderDetails = await _orderDetailRepo.FindBy(
                     od => salesOrders.Select(so => so.OrderId).Contains(od.OrderId)
                 );
 
+                var purchaseOrderDetails = await _purchaseOrderDetailRepo.GetAll();
+                var purchaseOrders = await _purchaseOrderRepo.GetAll();
+
                 double totalRevenue = orderDetails.Sum(od => (od.Quantity ?? 0) * (od.UnitPrice ?? 0) - (od.Discount ?? 0));
-                double totalCost = orderDetails.Sum(od => (od.Quantity ?? 0) * (od.UnitPrice ?? 0) * 0.7);
+                double totalCost = orderDetails.Sum(od => 
+                {
+                    var unitCost = GetLatestProductUnitCost(od.ProductId, purchaseOrderDetails, purchaseOrders);
+                    return (od.Quantity ?? 0) * unitCost;
+                });
                 double grossProfit = totalRevenue - totalCost;
-                double operatingExpense = 0; // Có thể thêm chi phí hoạt động nếu có
+                double operatingExpense = 0;
                 double netProfit = grossProfit - operatingExpense;
                 double profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
@@ -114,6 +121,9 @@ namespace PipeVolt_BLL.Services
 
                 var result = new List<RevenueDetailDto>();
 
+                var purchaseOrderDetails = await _purchaseOrderDetailRepo.GetAll();
+                var purchaseOrders = await _purchaseOrderRepo.GetAll();
+
                 if (periodType == "Daily")
                 {
                     for (var date = fromDate; date <= toDate; date = date.AddDays(1))
@@ -123,7 +133,11 @@ namespace PipeVolt_BLL.Services
                         ).ToList();
 
                         double revenue = dayDetails.Sum(od => (od.Quantity ?? 0) * (od.UnitPrice ?? 0) - (od.Discount ?? 0));
-                        double cost = dayDetails.Sum(od => (od.Quantity ?? 0) * (od.UnitPrice ?? 0) * 0.7);
+                        double cost = dayDetails.Sum(od => 
+                        {
+                            var unitCost = GetLatestProductUnitCost(od.ProductId, purchaseOrderDetails, purchaseOrders);
+                            return (od.Quantity ?? 0) * unitCost;
+                        });
 
                         result.Add(new RevenueDetailDto
                         {
@@ -151,7 +165,11 @@ namespace PipeVolt_BLL.Services
                     foreach (var month in months)
                     {
                         double revenue = month.Value.Sum(od => (od.Quantity ?? 0) * (od.UnitPrice ?? 0) - (od.Discount ?? 0));
-                        double cost = month.Value.Sum(od => (od.Quantity ?? 0) * (od.UnitPrice ?? 0) * 0.7);
+                        double cost = month.Value.Sum(od => 
+                        {
+                            var unitCost = GetLatestProductUnitCost(od.ProductId, purchaseOrderDetails, purchaseOrders);
+                            return (od.Quantity ?? 0) * unitCost;
+                        });
 
                         result.Add(new RevenueDetailDto
                         {
@@ -238,21 +256,30 @@ namespace PipeVolt_BLL.Services
                 var products = (await _productRepo.GetAll()).ToList();
                 var categories = (await _categoryRepo.GetAll()).ToList();
 
+                var purchaseOrderDetails = await _purchaseOrderDetailRepo.GetAll();
+                var purchaseOrders = await _purchaseOrderRepo.GetAll();
+
                 var result = inventories
                     .GroupBy(inv => inv.ProductId)
-                    .Select(g => new InventoryReportDto
-                    {
-                        ProductId = g.Key,
-                        ProductName = products.FirstOrDefault(p => p.ProductId == g.Key)?.ProductName ?? "Unknown",
-                        ProductCode = products.FirstOrDefault(p => p.ProductId == g.Key)?.ProductCode ?? "",
-                        CategoryId = products.FirstOrDefault(p => p.ProductId == g.Key)?.CategoryId ?? 0,
-                        CategoryName = categories.FirstOrDefault(c => c.CategoryId == products.FirstOrDefault(p => p.ProductId == g.Key)?.CategoryId)?.CategoryName ?? "",
-                        TotalQuantity = g.Sum(inv => inv.Quantity),
-                        LowStockQuantity = 10,
-                        OverStockQuantity = 500,
-                        TotalValue = g.Sum(inv => (inv.Quantity) * (products.FirstOrDefault(p => p.ProductId == g.Key)?.SellingPrice ?? 0) * 0.7),
-                        UnitCost = (products.FirstOrDefault(p => p.ProductId == g.Key)?.SellingPrice ?? 0) * 0.7,
-                        Status = DetermineInventoryStatus(g.Sum(inv => inv.Quantity), products.FirstOrDefault(p => p.ProductId == g.Key))
+                    .Select(g => {
+                        var product = products.FirstOrDefault(p => p.ProductId == g.Key);
+                        var unitCost = GetLatestProductUnitCost(g.Key, purchaseOrderDetails, purchaseOrders);
+                        int quantity = g.Sum(inv => inv.Quantity);
+
+                        return new InventoryReportDto
+                        {
+                            ProductId = g.Key,
+                            ProductName = product?.ProductName ?? "Unknown",
+                            ProductCode = product?.ProductCode ?? "",
+                            CategoryId = product?.CategoryId ?? 0,
+                            CategoryName = categories.FirstOrDefault(c => c.CategoryId == product?.CategoryId)?.CategoryName ?? "",
+                            TotalQuantity = quantity,
+                            LowStockQuantity = 10,
+                            OverStockQuantity = 500,
+                            TotalValue = quantity * unitCost,
+                            UnitCost = unitCost,
+                            Status = DetermineInventoryStatus(quantity, product)
+                        };
                     })
                     .ToList();
 
@@ -380,20 +407,31 @@ namespace PipeVolt_BLL.Services
 
                 var products = await _productRepo.GetAll();
 
+                var purchaseOrderDetails = await _purchaseOrderDetailRepo.GetAll();
+                var purchaseOrders = await _purchaseOrderRepo.GetAll();
+
                 var result = orderDetails
                     .GroupBy(od => od.ProductId)
-                    .Select(g => new CostProfitMarginDto
-                    {
-                        ProductId = g.Key,
-                        ProductName = products.FirstOrDefault(p => p.ProductId == g.Key)?.ProductName ?? "Unknown",
-                        ProductCode = products.FirstOrDefault(p => p.ProductId == g.Key)?.ProductCode ?? "",
-                        UnitCost = (g.FirstOrDefault()?.UnitPrice ?? 0) * 0.7,
-                        AverageSalePrice = g.Count() > 0 ? g.Average(od => od.UnitPrice ?? 0) : 0,
-                        GrossProfitPerUnit = (g.Count() > 0 ? g.Average(od => od.UnitPrice ?? 0) : 0) - ((g.FirstOrDefault()?.UnitPrice ?? 0) * 0.7),
-                        ProfitMarginPercent = CalculateMarginPercent((g.FirstOrDefault()?.UnitPrice ?? 0) * 0.7, g.Count() > 0 ? g.Average(od => od.UnitPrice ?? 0) : 0),
-                        QuantitySold = g.Sum(od => od.Quantity ?? 0),
-                        TotalGrossProfit = g.Sum(od => ((od.UnitPrice ?? 0) - ((od.UnitPrice ?? 0) * 0.7)) * (od.Quantity ?? 0)),
-                        ProfitLevel = DetermineProfitLevel(CalculateMarginPercent((g.FirstOrDefault()?.UnitPrice ?? 0) * 0.7, g.Count() > 0 ? g.Average(od => od.UnitPrice ?? 0) : 0))
+                    .Select(g => {
+                        var unitCost = GetLatestProductUnitCost(g.Key, purchaseOrderDetails, purchaseOrders);
+                        double avgSalePrice = g.Count() > 0 ? g.Average(od => od.UnitPrice ?? 0) : 0;
+                        double grossProfitPerUnit = avgSalePrice - unitCost;
+                        double marginPercent = CalculateMarginPercent(unitCost, avgSalePrice);
+                        double totalGrossProfit = g.Sum(od => ((od.UnitPrice ?? 0) - unitCost) * (od.Quantity ?? 0));
+
+                        return new CostProfitMarginDto
+                        {
+                            ProductId = g.Key,
+                            ProductName = products.FirstOrDefault(p => p.ProductId == g.Key)?.ProductName ?? "Unknown",
+                            ProductCode = products.FirstOrDefault(p => p.ProductId == g.Key)?.ProductCode ?? "",
+                            UnitCost = unitCost,
+                            AverageSalePrice = avgSalePrice,
+                            GrossProfitPerUnit = grossProfitPerUnit,
+                            ProfitMarginPercent = marginPercent,
+                            QuantitySold = g.Sum(od => od.Quantity ?? 0),
+                            TotalGrossProfit = totalGrossProfit,
+                            ProfitLevel = DetermineProfitLevel(marginPercent)
+                        };
                     })
                     .OrderByDescending(p => p.TotalGrossProfit)
                     .ToList();
@@ -424,34 +462,35 @@ namespace PipeVolt_BLL.Services
                 var products = await _productRepo.GetAll();
                 var categories = await _categoryRepo.GetAll();
 
+                var purchaseOrderDetails = await _purchaseOrderDetailRepo.GetAll();
+                var purchaseOrders = await _purchaseOrderRepo.GetAll();
+
                 var result = categories
-                    .Select(cat => new CategoryProfitAnalysisDto
-                    {
-                        CategoryId = cat.CategoryId,
-                        CategoryName = cat.CategoryName ?? "Unknown",
-                        TotalRevenue = orderDetails
+                    .Select(cat => {
+                        var catOrderDetails = orderDetails
                             .Where(od => products.FirstOrDefault(p => p.ProductId == od.ProductId)?.CategoryId == cat.CategoryId)
-                            .Sum(od => (od.Quantity ?? 0) * (od.UnitPrice ?? 0) - (od.Discount ?? 0)),
-                        TotalCost = orderDetails
-                            .Where(od => products.FirstOrDefault(p => p.ProductId == od.ProductId)?.CategoryId == cat.CategoryId)
-                            .Sum(od => (od.Quantity ?? 0) * (od.UnitPrice ?? 0) * 0.7),
-                        ProductCount = products.Count(p => p.CategoryId == cat.CategoryId),
-                        TotalQuantitySold = orderDetails
-                            .Where(od => products.FirstOrDefault(p => p.ProductId == od.ProductId)?.CategoryId == cat.CategoryId)
-                            .Sum(od => od.Quantity ?? 0)
+                            .ToList();
+
+                        double totalRevenue = catOrderDetails.Sum(od => (od.Quantity ?? 0) * (od.UnitPrice ?? 0) - (od.Discount ?? 0));
+                        double totalCost = catOrderDetails.Sum(od =>
+                        {
+                            var unitCost = GetLatestProductUnitCost(od.ProductId, purchaseOrderDetails, purchaseOrders);
+                            return (od.Quantity ?? 0) * unitCost;
+                        });
+
+                        return new CategoryProfitAnalysisDto
+                        {
+                            CategoryId = cat.CategoryId,
+                            CategoryName = cat.CategoryName ?? "Unknown",
+                            TotalRevenue = totalRevenue,
+                            TotalCost = totalCost,
+                            TotalGrossProfit = totalRevenue - totalCost,
+                            ProfitMarginPercent = totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0,
+                            ProductCount = products.Count(p => p.CategoryId == cat.CategoryId),
+                            TotalQuantitySold = catOrderDetails.Sum(od => od.Quantity ?? 0)
+                        };
                     })
                     .Where(c => c.TotalRevenue > 0)
-                    .Select(c => new CategoryProfitAnalysisDto
-                    {
-                        CategoryId = c.CategoryId,
-                        CategoryName = c.CategoryName,
-                        TotalRevenue = c.TotalRevenue,
-                        TotalCost = c.TotalCost,
-                        TotalGrossProfit = c.TotalRevenue - c.TotalCost,
-                        ProfitMarginPercent = c.TotalRevenue > 0 ? ((c.TotalRevenue - c.TotalCost) / c.TotalRevenue) * 100 : 0,
-                        ProductCount = c.ProductCount,
-                        TotalQuantitySold = c.TotalQuantitySold
-                    })
                     .OrderByDescending(c => c.TotalGrossProfit)
                     .ToList();
 
@@ -465,6 +504,24 @@ namespace PipeVolt_BLL.Services
         }
 
         // ========== HELPERS ==========
+        /// <summary>
+        /// Lấy unit cost từ đơn hàng nhập gần nhất của sản phẩm
+        /// Nếu chưa có đơn hàng nhập, trả về 0
+        /// </summary>
+        private double GetLatestProductUnitCost(int productId, IEnumerable<PurchaseOrderDetail> purchaseOrderDetails, IEnumerable<PurchaseOrder> purchaseOrders)
+        {
+            var latestPOD = purchaseOrderDetails
+                .Where(pod => pod.ProductId == productId)
+                .Join(purchaseOrders,
+                    pod => pod.PurchaseOrderId,
+                    po => po.PurchaseOrderId,
+                    (pod, po) => new { Pod = pod, Po = po })
+                .OrderByDescending(x => x.Po.OrderDate)
+                .FirstOrDefault();
+
+            return latestPOD?.Pod.UnitCost ?? 0;
+        }
+
         private string DetermineInventoryStatus(int quantity, Product product)
         {
             if (product == null) return "Unknown";

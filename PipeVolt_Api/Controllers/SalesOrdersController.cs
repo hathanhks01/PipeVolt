@@ -90,5 +90,24 @@ namespace PipeVolt_Api.Controllers
 
             return Ok(result);
         }
+
+        /// <summary>
+        /// Kiểm tra trạng thái đơn hàng theo orderCode (dùng cho FE polling sau thanh toán online)
+        /// </summary>
+        [HttpGet("status/{orderCode}")]
+        public async Task<ActionResult<object>> GetOrderStatus(string orderCode)
+        {
+            var order = await _service.GetByOrderCodeAsync(orderCode);
+            if (order == null)
+                return NotFound("Không tìm thấy đơn hàng.");
+
+            return Ok(new
+            {
+                orderId = order.OrderId,
+                orderCode = order.OrderCode,
+                status = order.Status,
+                isPaid = order.Status >= (int)PipeVolt_DAL.Common.DataType.SaleStatus.shipping
+            });
+        }
     }
 }

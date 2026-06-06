@@ -12,6 +12,6 @@ namespace PipeVolt_BLL.IServices
         Task<SalesOrderDto> UpdateSalesOrderAsync(int id, UpdateSalesOrderDto dto);
         Task<List<SalesOrderDto>> GetSalesOrdersByUserIdAsync(int userId);
         Task<IQueryable<SalesOrder>> QueryOrderWithDetails(int orderId);
-
+        Task<SalesOrder?> GetByOrderCodeAsync(string orderCode);
     }
 }

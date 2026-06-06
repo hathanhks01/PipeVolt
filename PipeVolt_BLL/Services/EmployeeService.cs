@@ -73,21 +73,36 @@ namespace PipeVolt_BLL.Services
             var employees = await _repo.QueryBy(e => e.EmployeeId == employeeId);
             var employee = employees.FirstOrDefault();
 
-            if (employee==null)
+            if (employee == null)
             {
-                _logger.LogWarning($"Employee with ID {employeeId} not found.");
+                _logger.LogWarning($"Employee {employeeId} not found.");
                 throw new KeyNotFoundException("Employee not found");
-
             }
+
+            // ── THÊM: kiểm tra đã có account chưa ──────────────────────────
+            var existingAccounts = await _userAccountRepo.FindBy(
+                u => u.EmployeeId == employeeId);
+            var existing = existingAccounts.FirstOrDefault();
+
+            if (existing != null)
+            {
+                _logger.LogWarning(
+                    $"Employee {employeeId} already has UserAccount {existing.UserId}. Cannot create duplicate.");
+                throw new InvalidOperationException($"Nhân viên này đã có tài khoản. Tên đăng nhập: {existing.Username}");
+            }
+            // ────────────────────────────────────────────────────────────────
+
             var account = new UserAccount
             {
                 Username = employee.EmployeeCode,
                 Password = BCrypt.Net.BCrypt.HashPassword(employee.EmployeeCode),
-                UserType =(int)UserType.Employee,
+                UserType = (int)UserType.Employee,
                 EmployeeId = employee.EmployeeId,
-                Status =(int)UserStatus.Active,
+                Status = (int)UserStatus.Active,
             };
+
             await _userAccountRepo.Create(account);
+            _logger.LogInformation($"Created UserAccount for Employee {employeeId}.");
 
             return _mapper.Map<UserAccountDto>(account);
         }

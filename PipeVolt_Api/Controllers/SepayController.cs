@@ -6,6 +6,7 @@ using PipeVolt_DAL.Common;
 using System;
 using System.Threading.Tasks;
 using System.Linq;
+using PipeVolt_BLL.IServices;
 
 namespace PipeVolt_Api.Controllers
 {
@@ -14,10 +15,12 @@ namespace PipeVolt_Api.Controllers
     public class SepayController : ControllerBase
     {
         private readonly PipeVoltDbContext _context;
+        private readonly ICheckoutService _checkoutService;
 
-        public SepayController(PipeVoltDbContext context)
+        public SepayController(PipeVoltDbContext context, ICheckoutService checkoutService)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
+            _checkoutService = checkoutService;
         }
 
         [HttpPost("payment/access")]
@@ -45,19 +48,26 @@ namespace PipeVolt_Api.Controllers
                 if (string.IsNullOrWhiteSpace(orderCode) && !string.IsNullOrWhiteSpace(request.Content))
                 {
                     var content = request.Content;
-                    var index = content.IndexOf("ORD-", StringComparison.OrdinalIgnoreCase);
-                    if (index >= 0)
+                    var matchWithDash = System.Text.RegularExpressions.Regex.Match(content, @"ORD-\d{14}-[a-zA-Z0-9]{8}", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    var matchWithoutDash = System.Text.RegularExpressions.Regex.Match(content, @"ORD\d{14}[a-zA-Z0-9]{8}", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                    if (matchWithDash.Success)
                     {
-                        var potentialCode = content.Substring(index).Trim();
-                        var spaceIndex = potentialCode.IndexOf(' ');
-                        if (spaceIndex > 0)
-                        {
-                            orderCode = potentialCode.Substring(0, spaceIndex);
-                        }
-                        else
-                        {
-                            orderCode = potentialCode;
-                        }
+                        orderCode = matchWithDash.Value;
+                    }
+                    else if (matchWithoutDash.Success)
+                    {
+                        var rawCode = matchWithoutDash.Value;
+                        orderCode = $"ORD-{rawCode.Substring(3, 14)}-{rawCode.Substring(17, 8).ToLower()}";
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(orderCode))
+                {
+                    var cleanCodeMatch = System.Text.RegularExpressions.Regex.Match(orderCode, @"^ORD\d{14}[a-zA-Z0-9]{8}$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (cleanCodeMatch.Success)
+                    {
+                        orderCode = $"ORD-{orderCode.Substring(3, 14)}-{orderCode.Substring(17, 8).ToLower()}";
                     }
                 }
 
@@ -76,7 +86,7 @@ namespace PipeVolt_Api.Controllers
                 }
 
                 // Nếu đơn hàng đã hoàn thành, trả về thành công để tránh SePay gửi lại
-                if (salesOrder.Status == (int)DataType.SaleStatus.Completed)
+                if (salesOrder.Status == (int)DataType.SaleStatus.Completed || salesOrder.Status == (int)DataType.SaleStatus.shipping)
                 {
                     return Ok(new { Message = "Payment already processed and completed" });
                 }
@@ -84,13 +94,127 @@ namespace PipeVolt_Api.Controllers
                 // 4. Cập nhật trạng thái đơn hàng sang shipping
                 salesOrder.Status = (int)DataType.SaleStatus.shipping;
 
-                // 5. Cập nhật hóa đơn sang Paid
+                // Cập nhật thông tin tài chính cho SalesOrder từ số tiền thực tế chuyển khoản
+                // TransferAmount = NetAmount (Tổng tiền sau thuế VAT 10%)
+                double soNetAmount = (double)request.TransferAmount;
+                double soTotalAmount = Math.Round(soNetAmount / 1.1, 2); // Tiền hàng chưa thuế
+                double soTaxAmount = Math.Round(soNetAmount - soTotalAmount, 2);  // Tiền thuế VAT
+
+                salesOrder.NetAmount = soNetAmount;
+                salesOrder.TotalAmount = soTotalAmount;
+                salesOrder.TaxAmount = soTaxAmount;
+
+                // Trừ inventory FIFO theo các OrderDetail của đơn này
+                var orderDetails = await _context.OrderDetails
+                    .Where(od => od.OrderId == salesOrder.OrderId)
+                    .ToListAsync();
+
+                foreach (var detail in orderDetails)
+                {
+                    var inventoryList = await _context.Inventories
+                        .Where(i => i.ProductId == detail.ProductId)
+                        .OrderBy(i => i.UpdatedAt)
+                        .ToListAsync();
+
+                    int remaining = detail.Quantity ?? 0;
+                    foreach (var inv in inventoryList)
+                    {
+                        if (remaining <= 0) break;
+                        int deduct = Math.Min(inv.Quantity, remaining);
+                        inv.Quantity -= deduct;
+                        inv.UpdatedAt = DateTime.Now;
+                        remaining -= deduct;
+                    }
+
+                    if (remaining > 0)
+                    {
+                        // Log cảnh báo — không throw để tránh webhook retry loop
+                        Console.WriteLine($"[Sepay webhook] WARNING: insufficient stock for product {detail.ProductId}");
+                    }
+                }
+
+                // Xóa các CartItem đã thanh toán
+                var cartItemProductIds = orderDetails.Select(od => od.ProductId).ToList();
+                if (salesOrder.CustomerId.HasValue)
+                {
+                    var cart = await _context.Carts
+                        .Include(c => c.CartItems)
+                        .FirstOrDefaultAsync(c => c.CustomerId == salesOrder.CustomerId.Value);
+
+                    if (cart != null)
+                    {
+                        var cartItemsToRemove = cart.CartItems
+                            .Where(ci => cartItemProductIds.Contains(ci.ProductId))
+                            .ToList();
+                        _context.CartItems.RemoveRange(cartItemsToRemove);
+                    }
+                }
+
+                // 5. Cập nhật hoặc tạo mới hóa đơn sang Paid
                 var invoice = await _context.Invoices
+                    .Include(i => i.InvoiceDetails)
                     .FirstOrDefaultAsync(i => i.OrderId == salesOrder.OrderId);
+
+                double totalAmt = (double)request.TransferAmount;
+                double vatRate = 0.1;
+                double subTotal = Math.Round(totalAmt / 1.1, 2);
+                double vatAmount = Math.Round(totalAmt - subTotal, 2);
+
                 if (invoice != null)
                 {
                     invoice.Status = (int)DataType.InvoiceStatus.Paid;
                     invoice.PaymentStatus = (int)DataType.PaymentStatus.Paid;
+                    invoice.SubTotal = subTotal;
+                    invoice.VatRate = vatRate;
+                    invoice.VatAmount = vatAmount;
+                    invoice.TotalAmount = totalAmt;
+                    invoice.UpdatedAt = DateTime.Now;
+                }
+                else
+                {
+                    var customer = salesOrder.CustomerId.HasValue 
+                        ? await _context.Customers.FindAsync(salesOrder.CustomerId.Value) 
+                        : null;
+
+                    invoice = new Invoice
+                    {
+                        InvoiceNumber = $"INV-{DateTime.Now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString().Substring(0, 8)}",
+                        OrderId = salesOrder.OrderId,
+                        CustomerId = salesOrder.CustomerId,
+                        CustomerName = customer?.CustomerName ?? "Unknown",
+                        CustomerAddress = customer?.Address,
+                        CustomerPhone = customer?.Phone,
+                        CustomerTaxCode = customer?.TaxCode,
+                        IssueDate = DateTime.Now,
+                        DueDate = DateTime.Now.AddDays(3),
+                        SubTotal = subTotal,
+                        VatRate = vatRate,
+                        VatAmount = vatAmount,
+                        TotalAmount = totalAmt,
+                        Status = (int)DataType.InvoiceStatus.Paid,
+                        PaymentStatus = (int)DataType.PaymentStatus.Paid,
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
+                    };
+
+                    foreach (var detail in orderDetails)
+                    {
+                        var product = await _context.Products.FindAsync(detail.ProductId);
+                        var invoiceDetail = new InvoiceDetail
+                        {
+                            ProductId = detail.ProductId,
+                            ProductName = product?.ProductName ?? "Unknown",
+                            ProductCode = product?.ProductCode ?? "Unknown",
+                            Unit = product?.Unit,
+                            Quantity = detail.Quantity ?? 0,
+                            UnitPrice = detail.UnitPrice ?? 0,
+                            Discount = detail.Discount ?? 0,
+                            LineTotal = (detail.Quantity ?? 0) * (detail.UnitPrice ?? 0) - (detail.Discount ?? 0)
+                        };
+                        invoice.InvoiceDetails.Add(invoiceDetail);
+                    }
+
+                    _context.Invoices.Add(invoice);
                 }
 
                 // 6. Ghi nhận giao dịch vào bảng PAYMENT_TRANSACTION

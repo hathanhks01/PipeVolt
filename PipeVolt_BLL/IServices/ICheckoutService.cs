@@ -8,6 +8,6 @@ namespace PipeVolt_BLL.IServices
         Task<int> CreateOrderAndCheckoutAsync(int customerId, int paymentMethodId, List<int> cartItemIds);
         Task<int> PosCheckoutAsync(List<PosItem> items, int paymentMethodId, PosCustomerInfo customerInfo = null, int? cashierId = null, decimal discountPercent = 0);
         Task CheckoutAsync(CheckoutDto checkoutDto);
-
+        Task<CreatePendingOrderResult> CreatePendingOrderAsync(int customerId, int paymentMethodId, List<int> cartItemIds);
     }
 }

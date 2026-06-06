@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -29,9 +29,16 @@ namespace PipeVolt_DAL.DTOS
     public class PosCustomerInfo
     {
         public int? CustomerId { get; set; }
-        public string CustomerName { get; set; }
-        public string CustomerPhone { get; set; }
-        public string CustomerAddress { get; set; }
-        public string CustomerTaxCode { get; set; }
+        public string? CustomerName { get; set; }
+        public string? CustomerPhone { get; set; }
+        public string? CustomerAddress { get; set; }
+        public string? CustomerTaxCode { get; set; }
+    }
+
+    public class CreatePendingOrderResult
+    {
+        public int OrderId { get; set; }
+        public string OrderCode { get; set; }
+        public double TotalAmount { get; set; }
     }
 }

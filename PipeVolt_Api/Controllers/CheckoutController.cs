@@ -76,6 +76,28 @@ namespace PipeVolt_Api.Controllers
                 return StatusCode(500, $"Lỗi máy chủ: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// Tạo đơn hàng pending cho thanh toán online (chưa trừ inventory)
+        /// </summary>
+        [HttpPost("{customerId}/pending")]
+        public async Task<ActionResult<CreatePendingOrderResult>> CreatePendingOrder(int customerId, [FromBody] CheckoutPartialRequest request)
+        {
+            try
+            {
+                if (request == null || request.CartItemIds == null || !request.CartItemIds.Any())
+                    return BadRequest("Danh sách sản phẩm không hợp lệ.");
+
+                var result = await _checkoutService.CreatePendingOrderAsync(
+                    customerId, request.PaymentMethodId, request.CartItemIds);
+
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex) { return NotFound(ex.Message); }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            catch (Exception ex) { return StatusCode(500, $"Lỗi máy chủ: {ex.Message}"); }
+        }
+
         /// <summary>
         /// Thanh toán tại quầy (POS) không cần giỏ hàng
         /// </summary>

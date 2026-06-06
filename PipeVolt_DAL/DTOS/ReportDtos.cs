@@ -221,9 +221,9 @@ namespace PipeVolt_DAL.DTOS
     // ========== REPORT REQUEST FILTERS ==========
     public class ReportFilterDto
     {
-        public DateTime FromDate { get; set; }
-        public DateTime ToDate { get; set; }
-        public string PeriodType { get; set; }          // Daily/Monthly/Yearly
+        public DateTime? FromDate { get; set; }
+        public DateTime? ToDate { get; set; }
+        public string PeriodType { get; set; } = "Daily";  // Daily/Monthly/Yearly
         public int? CategoryId { get; set; }
         public int? BrandId { get; set; }
         public int? SupplierId { get; set; }

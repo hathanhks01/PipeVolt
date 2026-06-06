@@ -191,5 +191,11 @@ namespace PipeVolt_BLL.Services
 
             return detailedQuery;
         }
+
+        public async Task<SalesOrder?> GetByOrderCodeAsync(string orderCode)
+        {
+            var query = await _repo.QueryBy(o => o.OrderCode == orderCode);
+            return await query.FirstOrDefaultAsync();
+        }
     }
 }

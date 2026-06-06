@@ -28,10 +28,10 @@ namespace PipeVolt_Api.Controllers
         {
             try
             {
-                if (filter == null || filter.FromDate == default || filter.ToDate == default)
+                if (filter == null || !filter.FromDate.HasValue || !filter.ToDate.HasValue)
                     return BadRequest(new { error = "FromDate and ToDate are required" });
 
-                var result = await _reportService.GetRevenueProfitAsync(filter.FromDate, filter.ToDate);
+                var result = await _reportService.GetRevenueProfitAsync(filter.FromDate.Value, filter.ToDate.Value);
                 return Ok(new { success = true, data = result });
             }
             catch (Exception ex)
@@ -46,11 +46,11 @@ namespace PipeVolt_Api.Controllers
         {
             try
             {
-                if (filter == null || filter.FromDate == default || filter.ToDate == default)
+                if (filter == null || !filter.FromDate.HasValue || !filter.ToDate.HasValue)
                     return BadRequest(new { error = "FromDate and ToDate are required" });
 
                 var periodType = filter.PeriodType ?? "Daily";
-                var result = await _reportService.GetRevenueTrendAsync(filter.FromDate, filter.ToDate, periodType);
+                var result = await _reportService.GetRevenueTrendAsync(filter.FromDate.Value, filter.ToDate.Value, periodType);
                 return Ok(new { success = true, data = result });
             }
             catch (Exception ex)
@@ -66,11 +66,11 @@ namespace PipeVolt_Api.Controllers
         {
             try
             {
-                if (filter == null || filter.FromDate == default || filter.ToDate == default)
+                if (filter == null || !filter.FromDate.HasValue || !filter.ToDate.HasValue)
                     return BadRequest(new { error = "FromDate and ToDate are required" });
 
                 int top = filter.Top ?? 10;
-                var result = await _reportService.GetTopSellersAsync(filter.FromDate, filter.ToDate, top);
+                var result = await _reportService.GetTopSellersAsync(filter.FromDate.Value, filter.ToDate.Value, top);
                 return Ok(new { success = true, data = result });
             }
             catch (Exception ex)
@@ -102,10 +102,10 @@ namespace PipeVolt_Api.Controllers
         {
             try
             {
-                if (filter == null || filter.FromDate == default || filter.ToDate == default)
+                if (filter == null || !filter.FromDate.HasValue || !filter.ToDate.HasValue)
                     return BadRequest(new { error = "FromDate and ToDate are required" });
 
-                var result = await _reportService.GetCustomerAnalysisAsync(filter.FromDate, filter.ToDate);
+                var result = await _reportService.GetCustomerAnalysisAsync(filter.FromDate.Value, filter.ToDate.Value);
                 return Ok(new { success = true, data = result });
             }
             catch (Exception ex)
@@ -121,10 +121,10 @@ namespace PipeVolt_Api.Controllers
         {
             try
             {
-                if (filter == null || filter.FromDate == default || filter.ToDate == default)
+                if (filter == null || !filter.FromDate.HasValue || !filter.ToDate.HasValue)
                     return BadRequest(new { error = "FromDate and ToDate are required" });
 
-                var result = await _reportService.GetSupplierAnalysisAsync(filter.FromDate, filter.ToDate);
+                var result = await _reportService.GetSupplierAnalysisAsync(filter.FromDate.Value, filter.ToDate.Value);
                 return Ok(new { success = true, data = result });
             }
             catch (Exception ex)
@@ -140,10 +140,10 @@ namespace PipeVolt_Api.Controllers
         {
             try
             {
-                if (filter == null || filter.FromDate == default || filter.ToDate == default)
+                if (filter == null || !filter.FromDate.HasValue || !filter.ToDate.HasValue)
                     return BadRequest(new { error = "FromDate and ToDate are required" });
 
-                var result = await _reportService.GetProfitMarginAnalysisAsync(filter.FromDate, filter.ToDate);
+                var result = await _reportService.GetProfitMarginAnalysisAsync(filter.FromDate.Value, filter.ToDate.Value);
                 return Ok(new { success = true, data = result });
             }
             catch (Exception ex)
@@ -158,10 +158,10 @@ namespace PipeVolt_Api.Controllers
         {
             try
             {
-                if (filter == null || filter.FromDate == default || filter.ToDate == default)
+                if (filter == null || !filter.FromDate.HasValue || !filter.ToDate.HasValue)
                     return BadRequest(new { error = "FromDate and ToDate are required" });
 
-                var result = await _reportService.GetCategoryProfitAnalysisAsync(filter.FromDate, filter.ToDate);
+                var result = await _reportService.GetCategoryProfitAnalysisAsync(filter.FromDate.Value, filter.ToDate.Value);
                 return Ok(new { success = true, data = result });
             }
             catch (Exception ex)
