@@ -112,7 +112,7 @@ namespace PipeVolt_BLL.Services
                 _logger.LogInformation($"GetRevenueTrendAsync: {fromDate} to {toDate}, Period: {periodType}");
 
                 var salesOrders = await _salesOrderRepo.FindBy(
-                    so => so.OrderDate >= fromDate && so.OrderDate <= toDate && (int?)so.Status == 5
+                    so => so.OrderDate >= fromDate && so.OrderDate <= toDate && (int?)so.Status == 3                    
                 );
 
                 var orderDetails = await _orderDetailRepo.FindBy(
@@ -200,7 +200,7 @@ namespace PipeVolt_BLL.Services
                 _logger.LogInformation($"GetTopSellersAsync: {fromDate} to {toDate}, Top: {top}");
 
                 var salesOrders = await _salesOrderRepo.FindBy(
-                    so => so.OrderDate >= fromDate && so.OrderDate <= toDate && (int?)so.Status == 5
+                    so => so.OrderDate >= fromDate && so.OrderDate <= toDate && (int?)so.Status == 3
                 );
 
                 var orderDetails = await _orderDetailRepo.FindBy(
@@ -301,7 +301,7 @@ namespace PipeVolt_BLL.Services
 
                 var customers = await _customerRepo.GetAll();
                 var salesOrders = await _salesOrderRepo.FindBy(
-                    so => so.OrderDate >= fromDate && so.OrderDate <= toDate && (int?)so.Status == 5
+                    so => so.OrderDate >= fromDate && so.OrderDate <= toDate && (int?)so.Status == 3
                 );
 
                 var result = customers
@@ -398,7 +398,7 @@ namespace PipeVolt_BLL.Services
                 _logger.LogInformation($"GetProfitMarginAnalysisAsync: {fromDate} to {toDate}");
 
                 var salesOrders = await _salesOrderRepo.FindBy(
-                    so => so.OrderDate >= fromDate && so.OrderDate <= toDate && (int?)so.Status == 5
+                    so => so.OrderDate >= fromDate && so.OrderDate <= toDate && (int?)so.Status == 3
                 );
 
                 var orderDetails = await _orderDetailRepo.FindBy(
@@ -452,7 +452,7 @@ namespace PipeVolt_BLL.Services
                 _logger.LogInformation($"GetCategoryProfitAnalysisAsync: {fromDate} to {toDate}");
 
                 var salesOrders = await _salesOrderRepo.FindBy(
-                    so => so.OrderDate >= fromDate && so.OrderDate <= toDate && (int?)so.Status == 5
+                    so => so.OrderDate >= fromDate && so.OrderDate <= toDate && (int?)so.Status == 3
                 );
 
                 var orderDetails = await _orderDetailRepo.FindBy(

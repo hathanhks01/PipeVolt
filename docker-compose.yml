@@ -1,0 +1,52 @@
+services:
+  # ── SQL Server ────────────────────────────────────────────────
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: pipevolt_db
+    environment:
+      SA_PASSWORD: "Hathanh2304@"
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"          # Mở ra ngoài để dùng SSMS kiểm tra nếu cần
+    volumes:
+      - sqldata:/var/opt/mssql              # Dữ liệu persistent
+      - ./init-db:/docker-entrypoint-initdb.d  # Script SQL chạy lần đầu (tuỳ chọn)
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Hathanh2304@' -Q 'SELECT 1' -No -C || exit 1"
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # ── ASP.NET Core API ──────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: ./PipeVolt_Api/Dockerfile
+    container_name: pipevolt_api
+    ports:
+      - "8080:8080"
+    environment:
+      # Override connection string trỏ vào service "db" bên trên
+      ConnectionStrings__DefaultConnection: >
+        Server=db,1433;Database=PipeVolt;
+        User Id=sa;Password=Hathanh2304@;
+        TrustServerCertificate=True;
+        Connection Timeout=60;
+      ASPNETCORE_ENVIRONMENT: Docker
+    volumes:
+      - uploads:/app/wwwroot/images        # Ảnh upload persistent
+    depends_on:
+      db:
+        condition: service_healthy         # Chờ DB sẵn sàng mới start API
+    restart: unless-stopped
+
+volumes:
+  sqldata:
+  uploads:

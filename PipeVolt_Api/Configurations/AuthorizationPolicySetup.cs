@@ -73,14 +73,21 @@ namespace PipeVolt_Api.Configurations
         }
         public static void AddGoogleAuthentication(this IServiceCollection services, IConfiguration configuration)
         {
-            services.AddAuthentication()
-                .AddGoogle(GoogleDefaults.AuthenticationScheme, options =>
-                {
-                    options.ClientId = configuration["Google:ClientId"];
-                    options.ClientSecret = configuration["Google:ClientSecret"];
-                    options.CallbackPath = "/signin-google";
-                    options.SignInScheme = JwtBearerDefaults.AuthenticationScheme;
-                });
+            var clientId = configuration["Google:ClientId"];
+            var clientSecret = configuration["Google:ClientSecret"];
+
+            // Only add Google authentication if credentials are provided
+            if (!string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(clientSecret))
+            {
+                services.AddAuthentication()
+                    .AddGoogle(GoogleDefaults.AuthenticationScheme, options =>
+                    {
+                        options.ClientId = clientId;
+                        options.ClientSecret = clientSecret;
+                        options.CallbackPath = "/signin-google";
+                        options.SignInScheme = JwtBearerDefaults.AuthenticationScheme;
+                    });
+            }
         }
     }
 }
