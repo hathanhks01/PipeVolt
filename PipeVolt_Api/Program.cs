@@ -66,10 +66,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
         policy
-            .AllowAnyOrigin() // 🔥 test
+            .WithOrigins("http://localhost:5173", "http://localhost:3000", "http://localhost:3030")
             .AllowAnyHeader()
             .AllowAnyMethod()
-            
+            .AllowCredentials()
     );
 });
 // Repositories
@@ -123,6 +123,8 @@ builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<IAIChatbotService, AIChatbotService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<ICacheService, CacheService>();
+builder.Services.AddScoped<IAIChatbotService, AIChatbotService>();
+builder.Services.AddScoped<IProductToolService, ProductToolService>();
 // Logger
 builder.Services.AddScoped<ILoggerService, LoggerService>();
 // Đăng ký JWT và Policy Authorization

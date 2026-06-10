@@ -1,4 +1,3 @@
-﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.Models;
@@ -16,389 +15,331 @@ namespace PipeVolt_BLL.Services
         private readonly PipeVoltDbContext _context;
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _configuration;
-        private readonly string _geminiApiKey;
-        private readonly string _geminiEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+        private readonly IProductToolService _productToolService;
+        private readonly string _openAiApiKey;
+        private readonly string _openAiModel;
+        private const string OpenAiEndpoint = "https://api.openai.com/v1/responses";
 
-        public AIChatbotService(PipeVoltDbContext context, HttpClient httpClient, IConfiguration configuration)
+        public AIChatbotService(
+            PipeVoltDbContext context,
+            HttpClient httpClient,
+            IConfiguration configuration,
+            IProductToolService productToolService)
         {
             _context = context;
             _httpClient = httpClient;
             _configuration = configuration;
-            _geminiApiKey = _configuration["OpenAI:ApiKey"]; // Giữ nguyên key từ config
+            _productToolService = productToolService;
+            _openAiApiKey = _configuration["OpenAI:ApiKey"] ?? throw new InvalidOperationException("OpenAI:ApiKey is not configured.");
+            _openAiModel = _configuration["OpenAI:Model"] ?? "gpt-5.4-mini";
         }
 
-        public async Task<ChatMessage> ProcessUserMessageAsync(int chatRoomId, string userMessage, int senderId, int senderType)
-        {
-            try
-            {
-                // Phân tích intent của tin nhắn
-                var intent = await AnalyzeMessageIntentAsync(userMessage);
-                string botResponse = "";
-
-                switch (intent.Type)
-                {
-                    case "product_inquiry":
-                        botResponse = await GetProductRecommendationAsync(userMessage, senderId);
-                        break;
-                    case "warranty_check":
-                        var warrantyInfo = ExtractWarrantyInfo(userMessage);
-                        botResponse = await CheckWarrantyAsync(warrantyInfo.ProductCode, warrantyInfo.SerialNumber);
-                        break;
-                    case "technical_support":
-                        botResponse = await GetTechnicalSupportAsync(userMessage);
-                        break;
-                    case "installation_guide":
-                        var productId = await ExtractProductIdFromMessage(userMessage);
-                        botResponse = await GetInstallationGuideAsync(productId);
-                        break;
-                    default:
-                        botResponse = await GetGeneralResponseAsync(userMessage);
-                        break;
-                }
-
-                // Lưu tin nhắn bot vào database
-                var botMessage = new ChatMessage
-                {
-                    ChatRoomId = chatRoomId,
-                    SenderId = 0, // Bot ID
-                    SenderType = 2, // Bot type
-                    MessageContent = botResponse,
-                    MessageType = 0, // Text
-                    IsRead = false,
-                    SentAt = DateTime.Now
-                };
-
-                _context.ChatMessages.Add(botMessage);
-                await _context.SaveChangesAsync();
-
-                return botMessage;
-            }
-            catch (Exception ex)
-            {
-                // Log error và trả về tin nhắn lỗi
-                return new ChatMessage
-                {
-                    ChatRoomId = chatRoomId,
-                    SenderId = 0,
-                    SenderType = 2,
-                    MessageContent = "Xin lỗi, tôi đang gặp sự cố. Vui lòng thử lại sau hoặc liên hệ nhân viên hỗ trợ.",
-                    MessageType = 0,
-                    IsRead = false,
-                    SentAt = DateTime.Now
-                };
-            }
-        }
+        // ─── Public entry points ───────────────────────────────────────────────
 
         public async Task<string> GetProductRecommendationAsync(string query, int? customerId = null)
         {
+            const string systemPrompt =
+                "Bạn là trợ lý tư vấn của cửa hàng vật tư điện nước PipeVolt.\n" +
+                "Nhiệm vụ: tư vấn sản phẩm phù hợp cho khách hàng dựa trên yêu cầu.\n" +
+                "QUAN TRỌNG: Luôn dùng tool search_products để tra cứu sản phẩm trước khi trả lời.\n" +
+                "Nếu không tìm thấy sản phẩm phù hợp trong cửa hàng, hãy từ chối lịch sự và KHÔNG gợi ý danh mục khác hay sản phẩm không có trong kết quả tìm kiếm.\n" +
+                "Chỉ tư vấn các sản phẩm thực sự có trong kết quả tool trả về.\n" +
+                "Trả lời ngắn gọn bằng tiếng Việt.";
+
+            return await RunAgenticLoopAsync(systemPrompt, query);
+        }
+
+        public async Task<ChatMessage> ProcessUserMessageAsync(
+            int chatRoomId, string userMessage, int senderId, int senderType)
+        {
+            const string systemPrompt =
+                "Bạn là trợ lý hỗ trợ khách hàng của PipeVolt - cửa hàng vật tư điện nước.\n" +
+                "Luôn dùng tool search_products để tra cứu sản phẩm trước khi tư vấn.\n" +
+                "QUAN TRỌNG:\n" +
+                "- Chỉ tư vấn các sản phẩm thực sự có trong kết quả tool trả về.\n" +
+                "- Nếu không tìm thấy sản phẩm phù hợp, hãy trả lời: 'Xin lỗi, cửa hàng hiện không có sản phẩm này.' và dừng lại.\n" +
+                "- KHÔNG gợi ý danh mục khác, KHÔNG đề xuất sản phẩm thay thế ngoài dữ liệu cửa hàng.\n" +
+                "Trả lời ngắn gọn bằng tiếng Việt.";
+
+            string botResponse;
             try
             {
-                // Lấy lịch sử mua hàng của khách hàng
-                List<Product> purchasedProducts = new List<Product>();
-                if (customerId.HasValue)
-                {
-                    purchasedProducts = await _context.OrderDetails
-                        .Include(od => od.Order)
-                        .Include(od => od.Product)
-                        .Where(od => od.Order.CustomerId == customerId.Value)
-                        .Select(od => od.Product)
-                        .Distinct()
-                        .ToListAsync();
-                }
-
-                // Lấy danh sách sản phẩm phù hợp
-                var products = await _context.Products
-                    .Include(p => p.Brand)
-                    .Include(p => p.Category)
-                    .Where(p => p.ProductName.Contains(query) ||
-                               p.Description.Contains(query) ||
-                               p.Category.CategoryName.Contains(query))
-                    .Take(5)
-                    .ToListAsync();
-
-                if (!products.Any())
-                {
-                    return "Xin lỗi, tôi không tìm thấy sản phẩm phù hợp với yêu cầu của bạn. Bạn có thể mô tả chi tiết hơn không?";
-                }
-
-                // Tạo prompt cho AI
-                var prompt = $@"
-                Khách hàng đang tìm: {query}
-                
-                Lịch sử mua hàng: {string.Join(", ", purchasedProducts.Select(p => p.ProductName))}
-                
-                Sản phẩm có sẵn:
-                {string.Join("\n", products.Select(p => $"- {p.ProductName} ({p.Brand?.BrandName}) - {p.SellingPrice:C} - {p.Description}"))}
-                
-                Hãy tư vấn sản phẩm phù hợp nhất cho khách hàng, giải thích lý do và đưa ra gợi ý cụ thể.
-                ";
-
-                return await CallGeminiAsync(prompt);
+                botResponse = await RunAgenticLoopAsync(systemPrompt, userMessage);
             }
             catch (Exception ex)
             {
-                return "Xin lỗi, tôi không thể tư vấn sản phẩm lúc này. Vui lòng liên hệ nhân viên để được hỗ trợ tốt hơn.";
+                Console.WriteLine($"[AIChatbot Error] {ex.Message}");
+                botResponse = "Xin lỗi, tôi đang gặp sự cố. Vui lòng thử lại hoặc liên hệ nhân viên hỗ trợ.";
             }
+
+            var botMessage = new ChatMessage
+            {
+                ChatRoomId = chatRoomId,
+                SenderId = 0,
+                SenderType = 1,
+                MessageContent = botResponse,
+                MessageType = 0,
+                IsRead = false,
+                SentAt = DateTime.Now
+            };
+
+            _context.ChatMessages.Add(botMessage);
+            await _context.SaveChangesAsync();
+            return botMessage;
         }
 
-        public async Task<string> CheckWarrantyAsync(string productCode, string serialNumber)
+        // ─── Agentic loop ──────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Sends a request to OpenAI Responses API and loops if the model wants to call tools,
+        /// using previous_response_id chaining to submit tool results.
+        /// </summary>
+        private async Task<string> RunAgenticLoopAsync(
+            string systemPrompt,
+            string userInput,
+            int maxIterations = 5)
         {
-            try
+            var tools = BuildToolDeclarations();
+            string? previousResponseId = null;
+
+            // First request
+            var firstRequest = new
             {
-                var warranty = await _context.Warranties
-                    .Include(w => w.Product)
-                    .Include(w => w.Customer)
-                    .FirstOrDefaultAsync(w =>
-                        w.Product.ProductCode == productCode &&
-                        w.SerialNumber == serialNumber);
+                model = _openAiModel,
+                instructions = systemPrompt,
+                input = userInput,
+                tools,
+                store = true,
+                previous_response_id = (string?)null
+            };
 
-                if (warranty == null)
-                {
-                    return $"Không tìm thấy thông tin bảo hành cho sản phẩm {productCode} với serial {serialNumber}. Vui lòng kiểm tra lại thông tin.";
-                }
+            var (responseId, outputItems) = await PostAsync(firstRequest);
+            previousResponseId = responseId;
 
-                var remainingDays = (warranty.EndDate?.ToDateTime(TimeOnly.MinValue) - DateTime.Now)?.Days ?? 0;
-
-                if (remainingDays > 0)
-                {
-                    return $@"
-📋 **THÔNG TIN BẢO HÀNH**
-🔹 Sản phẩm: {warranty.Product.ProductName}
-🔹 Serial: {warranty.SerialNumber}
-🔹 Ngày bắt đầu: {warranty.StartDate?.ToString("dd/MM/yyyy")}
-🔹 Ngày kết thúc: {warranty.EndDate?.ToString("dd/MM/yyyy")}
-🔹 Trạng thái: ✅ Còn bảo hành ({remainingDays} ngày)
-🔹 Ghi chú: {warranty.Notes ?? "Không có"}
-
-Sản phẩm của bạn vẫn trong thời gian bảo hành. Nếu có vấn đề, vui lòng mang sản phẩm đến trung tâm bảo hành.
-                    ";
-                }
-                else
-                {
-                    return $@"
-📋 **THÔNG TIN BẢO HÀNH**
-🔹 Sản phẩm: {warranty.Product.ProductName}
-🔹 Serial: {warranty.SerialNumber}
-🔹 Trạng thái: ❌ Hết hạn bảo hành ({Math.Abs(remainingDays)} ngày trước)
-
-Sản phẩm của bạn đã hết hạn bảo hành. Chúng tôi vẫn có thể hỗ trợ sửa chữa với chi phí hợp lý.
-                    ";
-                }
-            }
-            catch (Exception ex)
+            for (int iteration = 0; iteration < maxIterations; iteration++)
             {
-                return "Xin lỗi, tôi không thể kiểm tra thông tin bảo hành lúc này. Vui lòng thử lại sau.";
-            }
-        }
+                // Check for text reply
+                var textReply = ExtractTextReply(outputItems);
+                if (textReply != null)
+                    return textReply;
 
-        public async Task<string> GetTechnicalSupportAsync(string issue, int? productId = null)
-        {
-            try
-            {
-                string productInfo = "";
-                if (productId.HasValue)
+                // Collect all function_call items
+                var functionCalls = outputItems
+                    .Where(o => o.TryGetProperty("type", out var t) && t.GetString() == "function_call")
+                    .ToList();
+
+                if (!functionCalls.Any())
+                    break; // No text and no tool calls – bail out
+
+                // Execute each tool and build function_call_output list
+                var toolOutputs = new List<object>();
+                foreach (var fc in functionCalls)
                 {
-                    var product = await _context.Products
-                        .Include(p => p.Brand)
-                        .Include(p => p.Category)
-                        .FirstOrDefaultAsync(p => p.ProductId == productId.Value);
+                    var callId = fc.GetProperty("call_id").GetString()!;
+                    var toolName = fc.GetProperty("name").GetString()!;
+                    var argsRaw = fc.GetProperty("arguments").GetString() ?? "{}";
 
-                    if (product != null)
+                    var args = JsonSerializer.Deserialize<Dictionary<string, object>>(argsRaw);
+                    Console.WriteLine($"[Tool Call] {toolName} args={argsRaw}");
+
+                    string toolResult;
+                    try
                     {
-                        productInfo = $"Sản phẩm: {product.ProductName} ({product.Brand?.BrandName})";
+                        toolResult = await _productToolService.ExecuteToolAsync(toolName, args);
                     }
-                }
-
-                var prompt = $@"
-                Bạn là chuyên gia kỹ thuật về thiết bị điện nước.
-                
-                {productInfo}
-                Vấn đề khách hàng gặp phải: {issue}
-                
-                Hãy:
-                1. Phân tích nguyên nhân có thể
-                2. Đưa ra các bước khắc phục đơn giản khách hàng có thể tự thực hiện
-                3. Cảnh báo các trường hợp cần thợ chuyên nghiệp
-                4. Đưa ra lời khuyên an toàn
-                
-                Trả lời một cách chuyên nghiệp và dễ hiểu.
-                ";
-
-                return await CallGeminiAsync(prompt);
-            }
-            catch (Exception ex)
-            {
-                return "Xin lỗi, tôi không thể hỗ trợ kỹ thuật lúc này. Vui lòng liên hệ hotline để được hỗ trợ trực tiếp.";
-            }
-        }
-
-        public async Task<string> GetInstallationGuideAsync(int productId)
-        {
-            try
-            {
-                var product = await _context.Products
-                    .Include(p => p.Brand)
-                    .Include(p => p.Category)
-                    .FirstOrDefaultAsync(p => p.ProductId == productId);
-
-                if (product == null)
-                {
-                    return "Không tìm thấy thông tin sản phẩm để hướng dẫn lắp đặt.";
-                }
-
-                var prompt = $@"
-                Hãy tạo hướng dẫn lắp đặt chi tiết cho sản phẩm:
-                - Tên: {product.ProductName}
-                - Thương hiệu: {product.Brand?.BrandName}
-                - Danh mục: {product.Category?.CategoryName}
-                - Mô tả: {product.Description}
-                
-                Bao gồm:
-                1. Chuẩn bị trước khi lắp đặt
-                2. Dụng cụ cần thiết
-                3. Các bước lắp đặt chi tiết
-                4. Lưu ý an toàn
-                5. Kiểm tra sau lắp đặt
-                
-                Sử dụng emoji và format đẹp để dễ đọc.
-                ";
-
-                return await CallGeminiAsync(prompt);
-            }
-            catch (Exception ex)
-            {
-                return "Xin lỗi, tôi không thể cung cấp hướng dẫn lắp đặt lúc này. Vui lòng tham khảo sách hướng dẫn đi kèm sản phẩm.";
-            }
-        }
-
-        private async Task<MessageIntent> AnalyzeMessageIntentAsync(string message)
-        {
-            // Simple rule-based intent recognition
-            var lowerMessage = message.ToLower();
-
-            if (lowerMessage.Contains("bảo hành") || lowerMessage.Contains("warranty"))
-            {
-                return new MessageIntent { Type = "warranty_check", Confidence = 0.9 };
-            }
-            else if (lowerMessage.Contains("lắp đặt") || lowerMessage.Contains("cài đặt") || lowerMessage.Contains("install"))
-            {
-                return new MessageIntent { Type = "installation_guide", Confidence = 0.8 };
-            }
-            else if (lowerMessage.Contains("sửa chữa") || lowerMessage.Contains("hỏng") || lowerMessage.Contains("lỗi"))
-            {
-                return new MessageIntent { Type = "technical_support", Confidence = 0.8 };
-            }
-            else if (lowerMessage.Contains("sản phẩm") || lowerMessage.Contains("mua") || lowerMessage.Contains("tư vấn"))
-            {
-                return new MessageIntent { Type = "product_inquiry", Confidence = 0.7 };
-            }
-
-            return new MessageIntent { Type = "general", Confidence = 0.5 };
-        }
-
-        private async Task<string> CallGeminiAsync(string prompt)
-        {
-            try
-            {
-                var systemInstruction = "Bạn là trợ lý AI chuyên về thiết bị điện nước, luôn trả lời bằng tiếng Việt một cách thân thiện và chuyên nghiệp.";
-                var fullPrompt = $"{systemInstruction}\n\n{prompt}";
-
-                var requestBody = new
-                {
-                    contents = new[]
+                    catch (Exception ex)
                     {
-                        new
-                        {
-                            parts = new[]
-                            {
-                                new { text = fullPrompt }
-                            }
-                        }
-                    },
-                    generationConfig = new
-                    {
-                        temperature = 0.7,
-                        maxOutputTokens = 500,
-                        topP = 0.8,
-                        topK = 40
+                        Console.WriteLine($"[Tool Error] {toolName}: {ex.Message}");
+                        toolResult = $"Lỗi khi thực hiện tool {toolName}: {ex.Message}";
                     }
+
+                    toolOutputs.Add(new
+                    {
+                        type = "function_call_output",
+                        call_id = callId,
+                        output = toolResult
+                    });
+                }
+
+                // Submit tool results as next turn
+                var followupRequest = new
+                {
+                    model = _openAiModel,
+                    instructions = systemPrompt,
+                    input = toolOutputs,   // array of function_call_output items
+                    tools,
+                    store = true,
+                    previous_response_id = previousResponseId
                 };
 
-                var json = JsonSerializer.Serialize(requestBody);
-                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-
-                var url = $"{_geminiEndpoint}?key={_geminiApiKey}";
-                var response = await _httpClient.PostAsync(url, content);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var responseBody = await response.Content.ReadAsStringAsync();
-                    var result = JsonSerializer.Deserialize<GeminiResponse>(responseBody);
-
-                    var generatedText = result?.candidates?.FirstOrDefault()?.content?.parts?.FirstOrDefault()?.text;
-                    return generatedText ?? "Xin lỗi, tôi không thể trả lời lúc này.";
-                }
-
-                return "Xin lỗi, hệ thống AI đang bận. Vui lòng thử lại sau.";
+                (responseId, outputItems) = await PostAsync(followupRequest);
+                previousResponseId = responseId;
             }
-            catch (Exception ex)
+
+            // If we exhausted iterations without a text reply
+            var lastText = ExtractTextReply(outputItems);
+            return lastText ?? "Xin lỗi, tôi không thể xử lý yêu cầu này lúc này. Vui lòng thử lại.";
+        }
+
+        // ─── HTTP helpers ──────────────────────────────────────────────────────
+
+        private async Task<(string ResponseId, List<JsonElement> OutputItems)> PostAsync(object requestBody)
+        {
+            var json = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions
             {
-                return "Xin lỗi, tôi đang gặp sự cố kỹ thuật. Vui lòng liên hệ nhân viên hỗ trợ.";
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            });
+
+            var request = new HttpRequestMessage(HttpMethod.Post, OpenAiEndpoint);
+            request.Headers.Add("Authorization", $"Bearer {_openAiApiKey}");
+            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var httpResponse = await _httpClient.SendAsync(request);
+
+            if (!httpResponse.IsSuccessStatusCode)
+            {
+                var err = await httpResponse.Content.ReadAsStringAsync();
+                Console.WriteLine($"[OpenAI Error] {(int)httpResponse.StatusCode} {err}");
+                throw new HttpRequestException($"OpenAI API error {(int)httpResponse.StatusCode}: {err}");
             }
+
+            var body = await httpResponse.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<JsonElement>(body);
+
+            var responseId = result.GetProperty("id").GetString()!;
+            var outputItems = result.GetProperty("output").EnumerateArray().ToList();
+
+            return (responseId, outputItems);
         }
 
-        private async Task<string> GetGeneralResponseAsync(string query)
+        private static string? ExtractTextReply(List<JsonElement> outputItems)
         {
-            var prompt = $@"
-            Khách hàng hỏi: {query}
-            
-            Bạn là trợ lý của cửa hàng thiết bị điện nước PipeVolt.
-            Hãy trả lời thân thiện và hướng dẫn khách hàng đến dịch vụ phù hợp.
-            ";
+            foreach (var item in outputItems)
+            {
+                if (!item.TryGetProperty("type", out var typeEl)) continue;
+                if (typeEl.GetString() != "message") continue;
 
-            return await CallGeminiAsync(prompt);
+                if (!item.TryGetProperty("content", out var contentArr)) continue;
+
+                foreach (var part in contentArr.EnumerateArray())
+                {
+                    if (part.TryGetProperty("type", out var partType) &&
+                        partType.GetString() == "output_text" &&
+                        part.TryGetProperty("text", out var textEl))
+                    {
+                        return textEl.GetString();
+                    }
+                }
+            }
+            return null;
         }
 
-        private async Task<int> ExtractProductIdFromMessage(string message)
-        {
-            // Logic để extract product ID từ tin nhắn
-            // Có thể sử dụng regex hoặc NLP
-            return 0;
-        }
+        // ─── Tool declarations ─────────────────────────────────────────────────
 
-        private (string ProductCode, string SerialNumber) ExtractWarrantyInfo(string message)
+        /// <summary>
+        /// OpenAI Responses API uses a FLAT tool schema (name/description/parameters at top level),
+        /// unlike Chat Completions which wraps them inside a "function" object.
+        /// </summary>
+        private static object[] BuildToolDeclarations()
         {
-            // Logic để extract thông tin bảo hành từ tin nhắn
-            // Sử dụng regex để tìm mã sản phẩm và serial number
-            return ("", "");
+            return new object[]
+            {
+                new
+                {
+                    type = "function",
+                    name = "search_products",
+                    description = "Tìm kiếm sản phẩm theo từ khóa hoặc danh mục. Dùng khi khách hỏi về sản phẩm cụ thể.",
+                    parameters = new
+                    {
+                        type = "object",
+                        properties = new
+                        {
+                            keyword = new { type = "string", description = "Từ khóa tìm kiếm (tên sản phẩm, loại vật tư)" },
+                            categoryId = new { type = "integer", description = "ID danh mục (không bắt buộc)" }
+                        },
+                        required = new[] { "keyword" }
+                    }
+                },
+                new
+                {
+                    type = "function",
+                    name = "get_product_detail",
+                    description = "Lấy thông tin chi tiết một sản phẩm theo ID.",
+                    parameters = new
+                    {
+                        type = "object",
+                        properties = new
+                        {
+                            productId = new { type = "integer", description = "ID sản phẩm" }
+                        },
+                        required = new[] { "productId" }
+                    }
+                },
+                new
+                {
+                    type = "function",
+                    name = "check_inventory",
+                    description = "Kiểm tra tồn kho của sản phẩm. Dùng khi khách hỏi còn hàng không.",
+                    parameters = new
+                    {
+                        type = "object",
+                        properties = new
+                        {
+                            productId = new { type = "integer", description = "ID sản phẩm" }
+                        },
+                        required = new[] { "productId" }
+                    }
+                },
+                new
+                {
+                    type = "function",
+                    name = "get_categories",
+                    description = "Lấy danh sách tất cả danh mục sản phẩm.",
+                    parameters = new
+                    {
+                        type = "object",
+                        properties = new { }
+                    }
+                },
+                new
+                {
+                    type = "function",
+                    name = "get_products_by_price_range",
+                    description = "Lọc sản phẩm theo khoảng giá.",
+                    parameters = new
+                    {
+                        type = "object",
+                        properties = new
+                        {
+                            minPrice = new { type = "number", description = "Giá thấp nhất (VND)" },
+                            maxPrice = new { type = "number", description = "Giá cao nhất (VND)" }
+                        },
+                        required = new[] { "minPrice", "maxPrice" }
+                    }
+                }
+            };
         }
     }
 
-    // Supporting classes
-    public class MessageIntent
-    {
-        public string Type { get; set; }
-        public double Confidence { get; set; }
-    }
+    // ─── Supporting response classes (kept for compatibility) ──────────────────
 
-    // Gemini API Response Classes
     public class GeminiResponse
     {
-        public Candidate[] candidates { get; set; }
+        public Candidate[]? candidates { get; set; }
     }
 
     public class Candidate
     {
-        public Content content { get; set; }
+        public Content? content { get; set; }
     }
 
     public class Content
     {
-        public Part[] parts { get; set; }
+        public Part[]? parts { get; set; }
     }
 
     public class Part
     {
-        public string text { get; set; }
+        public string? text { get; set; }
     }
 }

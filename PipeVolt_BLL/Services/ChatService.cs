@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using PipeVolt_BLL.IServices;
 using PipeVolt_DAL.DTOS;
 using PipeVolt_DAL.Models;
@@ -446,8 +446,15 @@ namespace PipeVolt_BLL.Services
             }
             else if (message.SenderType == (int)UserType.Employee)
             {
-                var employee = await _context.Employees.FindAsync(message.SenderId);
-                senderName = employee?.EmployeeName ?? "Unknown Employee";
+                if (message.SenderId == 0)
+                {
+                    senderName = "Trợ lý AI";
+                }
+                else
+                {
+                    var employee = await _context.Employees.FindAsync(message.SenderId);
+                    senderName = employee?.EmployeeName ?? "Unknown Employee";
+                }
             }
 
             return new ChatMessageDto

@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using PipeVolt_BLL.IServices;
+using PipeVolt_BLL.Services;
 using System.ComponentModel.DataAnnotations;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -11,10 +13,12 @@ namespace PipeVolt_Api.Controllers
     public class ChatbotController : ControllerBase
     {
         private readonly IAIChatbotService _chatbotService;
+        private readonly IHubContext<ChatHub> _hubContext;
 
-        public ChatbotController(IAIChatbotService chatbotService)
+        public ChatbotController(IAIChatbotService chatbotService, IHubContext<ChatHub> hubContext)
         {
             _chatbotService = chatbotService;
+            _hubContext = hubContext;
         }
 
         /// <summary>
@@ -40,6 +44,21 @@ namespace PipeVolt_Api.Controllers
                     request.SenderId,
                     request.SenderType
                 );
+
+                // Broadcast bot response to all clients in the room via SignalR
+                await _hubContext.Clients.Group($"ChatRoom_{request.ChatRoomId}")
+                    .SendAsync("ReceiveMessage", new
+                    {
+                        messageId = botResponse.MessageId,
+                        chatRoomId = botResponse.ChatRoomId,
+                        senderId = botResponse.SenderId,
+                        senderType = botResponse.SenderType,
+                        senderName = "Trợ lý AI",
+                        messageContent = botResponse.MessageContent,
+                        messageType = botResponse.MessageType,
+                        isRead = botResponse.IsRead,
+                        sentAt = botResponse.SentAt
+                    });
 
                 // Trả về phản hồi thành công
                 return Ok(new
@@ -115,142 +134,7 @@ namespace PipeVolt_Api.Controllers
             }
         }
 
-        /// <summary>
-        /// Kiểm tra thông tin bảo hành sản phẩm
-        /// </summary>
-        /// <param name="request">Thông tin sản phẩm cần kiểm tra bảo hành</param>
-        /// <returns>Thông tin chi tiết về bảo hành</returns>
-        [HttpPost("check-warranty")]
-        public async Task<IActionResult> CheckWarranty([FromBody] WarrantyCheckRequest request)
-        {
-            try
-            {
-                // Validate thông tin bảo hành
-                if (string.IsNullOrWhiteSpace(request.ProductCode) || string.IsNullOrWhiteSpace(request.SerialNumber))
-                {
-                    return BadRequest("Vui lòng nhập đầy đủ mã sản phẩm và số serial");
-                }
-
-                // Gọi service kiểm tra thông tin bảo hành trong database
-                var warrantyInfo = await _chatbotService.CheckWarrantyAsync(
-                    request.ProductCode,
-                    request.SerialNumber
-                );
-
-                // Trả về thông tin bảo hành
-                return Ok(new
-                {
-                    success = true,
-                    message = "Kiểm tra bảo hành thành công",
-                    data = new
-                    {
-                        productCode = request.ProductCode,
-                        serialNumber = request.SerialNumber,
-                        warrantyInfo = warrantyInfo
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                // Xử lý lỗi kiểm tra bảo hành
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = "Không thể kiểm tra bảo hành lúc này",
-                    error = ex.Message
-                });
-            }
-        }
-
-        /// <summary>
-        /// Hỗ trợ kỹ thuật từ AI cho các vấn đề sản phẩm
-        /// </summary>
-        /// <param name="request">Mô tả vấn đề cần hỗ trợ</param>
-        /// <returns>Hướng dẫn khắc phục từ AI</returns>
-        [HttpPost("technical-support")]
-        public async Task<IActionResult> GetTechnicalSupport([FromBody] TechnicalSupportRequest request)
-        {
-            try
-            {
-                // Validate mô tả vấn đề
-                if (string.IsNullOrWhiteSpace(request.Issue))
-                {
-                    return BadRequest("Vui lòng mô tả vấn đề bạn gặp phải");
-                }
-
-                // Gọi service để AI phân tích và đưa ra hướng dẫn khắc phục
-                var supportResponse = await _chatbotService.GetTechnicalSupportAsync(
-                    request.Issue,
-                    request.ProductId
-                );
-
-                // Trả về hướng dẫn hỗ trợ kỹ thuật
-                return Ok(new
-                {
-                    success = true,
-                    message = "Hỗ trợ kỹ thuật thành công",
-                    data = new
-                    {
-                        issue = request.Issue,
-                        productId = request.ProductId,
-                        supportGuide = supportResponse
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                // Xử lý lỗi hỗ trợ kỹ thuật
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = "Không thể hỗ trợ kỹ thuật lúc này",
-                    error = ex.Message
-                });
-            }
-        }
-
-        /// <summary>
-        /// Lấy hướng dẫn lắp đặt sản phẩm từ AI
-        /// </summary>
-        /// <param name="productId">ID của sản phẩm cần hướng dẫn lắp đặt</param>
-        /// <returns>Hướng dẫn lắp đặt chi tiết</returns>
-        [HttpGet("installation-guide/{productId}")]
-        public async Task<IActionResult> GetInstallationGuide(int productId)
-        {
-            try
-            {
-                // Validate product ID
-                if (productId <= 0)
-                {
-                    return BadRequest("ID sản phẩm không hợp lệ");
-                }
-
-                // Gọi service để AI tạo hướng dẫn lắp đặt dựa trên thông tin sản phẩm
-                var installationGuide = await _chatbotService.GetInstallationGuideAsync(productId);
-
-                // Trả về hướng dẫn lắp đặt
-                return Ok(new
-                {
-                    success = true,
-                    message = "Lấy hướng dẫn lắp đặt thành công",
-                    data = new
-                    {
-                        productId = productId,
-                        installationGuide = installationGuide
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                // Xử lý lỗi khi lấy hướng dẫn
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = "Không thể lấy hướng dẫn lắp đặt lúc này",
-                    error = ex.Message
-                });
-            }
-        }
+       
 
         /// <summary>
         /// Kiểm tra trạng thái hoạt động của chatbot
