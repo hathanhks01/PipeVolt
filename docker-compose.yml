@@ -28,7 +28,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: ./PipeVolt_Api/Dockerfile
+      dockerfile: Dockerfile
     container_name: pipevolt_api
     ports:
       - "8080:8080"
